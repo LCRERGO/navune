@@ -1,0 +1,25 @@
+# Example Navune configuration for the Navune repository itself.
+# Copy to your own repo as navune.yaml, or run `navune init` to generate a
+# commented template. Budgets are quality-gate limits: smaller measured
+# values are better. A breach of an "error"-tier budget makes navune exit 1.
+# Weights blend the per-metric distance-from-budget scores into the composite
+# 0-100 index. This example intentionally mirrors the built-in defaults.
+version: 1
+
+exclude:
+  - "legacy"
+  - "**/migrations/**"
+
+budgets:
+  avg_complexity:        { limit: 10, tier: error }   # avg cyclomatic complexity per function
+  worst_complexity:      { limit: 50, tier: error }   # worst single function complexity
+  max_duplication_pct:   { limit: 5,  tier: warn  }   # duplicated tokens, % of all tokens
+  max_cycle_members:     { limit: 8,  tier: error }   # largest dependency cycle (SCC)
+  max_in_cycle_pct:      { limit: 10, tier: warn  }   # % of files that sit in a cycle
+
+weights:
+  avg_complexity:        25
+  worst_complexity:      15
+  max_duplication_pct:   20
+  max_cycle_members:     20
+  max_in_cycle_pct:      20

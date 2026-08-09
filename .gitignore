@@ -1,0 +1,11 @@
+# Binaries
+/navune
+/navune.exe
+
+# Test artifacts
+*.test
+*.out
+coverage.*
+
+# Editor/OS
+.DS_Store
