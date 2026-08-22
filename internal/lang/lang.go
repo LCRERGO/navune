@@ -6,7 +6,10 @@ package lang
 type Lang string
 
 const (
-	Go Lang = "go"
+	Go         Lang = "go"
+	TypeScript Lang = "ts"
+	JavaScript Lang = "js"
+	Python     Lang = "py"
 )
 
 // Class is how a file is treated for metrics and gates (ADR 0011).
@@ -77,6 +80,7 @@ type FileResult struct {
 	Functions []Function
 	Types     []TypeDecl
 	Imports   []string // raw import paths / module keys
+	Deps      []string // resolved internal dependency target paths (scripts)
 
 	Tokens []Token
 

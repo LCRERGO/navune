@@ -55,7 +55,7 @@ func Load(path string) (*Config, error) {
 func Defaults() *Config {
 	return &Config{
 		Version: 1,
-		Exclude: []string{".git", "vendor", "node_modules", "testdata"},
+		Exclude: []string{".git", "vendor", "node_modules", "testdata", "__pycache__", ".venv", "venv", "dist", "build"},
 		Budgets: map[string]Budget{
 			"avg_complexity":      {Limit: 10, Tier: "error"},
 			"worst_complexity":    {Limit: 50, Tier: "error"},
@@ -146,8 +146,8 @@ func Template() string {
 version: 1
 
 # Additional exclusion globs/directory names (built-ins: .git vendor
-# node_modules testdata). Generated code (e.g. "// Code generated ... DO NOT
-# EDIT.") is always skipped.
+# node_modules testdata __pycache__ .venv venv dist build). Generated code
+# (e.g. "// Code generated ... DO NOT EDIT.") is always skipped.
 exclude:
   - "legacy"
   - "**/migrations/**"
