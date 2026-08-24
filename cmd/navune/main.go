@@ -196,6 +196,6 @@ func runInit(args []string) int {
 
 func runVersion() int {
 	fmt.Printf("navune %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
-	fmt.Println("languages: go")
+	fmt.Println("languages: go, typescript, javascript, python")
 	return gate.ExitPass
 }

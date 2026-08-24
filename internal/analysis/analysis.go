@@ -20,6 +20,8 @@ import (
 	"github.com/lcr/navune/internal/graph"
 	"github.com/lcr/navune/internal/lang"
 	"github.com/lcr/navune/internal/lang/golang"
+	"github.com/lcr/navune/internal/lang/python"
+	"github.com/lcr/navune/internal/lang/treescript"
 )
 
 // FileReport is one file's row in the report (production or test).
@@ -104,6 +106,12 @@ func parserFor(langID lang.Lang) lang.Parser {
 	switch langID {
 	case lang.Go:
 		return golang.New()
+	case lang.TypeScript:
+		return treescript.NewTS()
+	case lang.JavaScript:
+		return treescript.NewJS()
+	case lang.Python:
+		return python.New()
 	}
 	return nil
 }
@@ -194,6 +202,7 @@ func Analyze(root string, cfg *config.Config) (*Report, error) {
 		return nil, fmt.Errorf("%d file(s) could not be analyzed:\n  %s", len(errs), strings.Join(errs, "\n  "))
 	}
 
+	resolveScriptDeps(prodFiles)
 	g := graph.Build(prodFiles)
 	dupRes := dupEngine().Detect(tokenSets(prodFiles))
 	sortGraph(g)

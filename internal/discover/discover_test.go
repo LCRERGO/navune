@@ -63,16 +63,25 @@ func contains(ss []string, s string) bool {
 func TestIsTestFile(t *testing.T) {
 	cases := []struct {
 		path string
+		lang lang.Lang
 		want bool
 	}{
-		{"foo_test.go", true},
-		{"foo.go", false},
-		{"internal/bar/bar_test.go", true},
+		{"foo_test.go", lang.Go, true},
+		{"foo.go", lang.Go, false},
+		{"internal/bar/bar_test.go", lang.Go, true},
+		{"a.test.ts", lang.TypeScript, true},
+		{"a.spec.tsx", lang.TypeScript, true},
+		{"a.ts", lang.TypeScript, false},
+		{"b.test.js", lang.JavaScript, true},
+		{"b.js", lang.JavaScript, false},
+		{"test_foo.py", lang.Python, true},
+		{"foo_test.py", lang.Python, true},
+		{"foo.py", lang.Python, false},
 	}
 	for _, c := range cases {
-		f := File{RelPath: c.path, Lang: lang.Go}
+		f := File{RelPath: c.path, Lang: c.lang}
 		if got := IsTestFile(f); got != c.want {
-			t.Errorf("IsTestFile(%q) = %v, want %v", c.path, got, c.want)
+			t.Errorf("IsTestFile(%q, %s) = %v, want %v", c.path, c.lang, got, c.want)
 		}
 	}
 }

@@ -71,6 +71,13 @@ func Build(files []*lang.FileResult) *Graph {
 
 	for _, n := range g.Nodes {
 		self := n.Index
+		// script languages resolve imports to concrete files (Deps)
+		for _, dep := range n.File.Deps {
+			if t, ok := g.byPath[dep]; ok && t != self {
+				g.succ[self][t] = struct{}{}
+				g.pred[t][self] = struct{}{}
+			}
+		}
 		for _, imp := range n.File.Imports {
 			if imp == n.File.ImportPath {
 				continue // a package cannot import itself

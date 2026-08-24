@@ -35,7 +35,14 @@ type Results struct {
 
 // extLang maps a file extension to a language.
 var extLang = map[string]lang.Lang{
-	".go": lang.Go,
+	".go":  lang.Go,
+	".ts":  lang.TypeScript,
+	".tsx": lang.TypeScript,
+	".js":  lang.JavaScript,
+	".jsx": lang.JavaScript,
+	".mjs": lang.JavaScript,
+	".cjs": lang.JavaScript,
+	".py":  lang.Python,
 }
 
 // Walk collects analyzable source files under root, honouring config
@@ -105,9 +112,20 @@ func hasGoMod(dir string) bool {
 
 // IsTestFile applies language-aware test classification by filename.
 func IsTestFile(f File) bool {
+	base := f.RelPath
 	switch f.Lang {
 	case lang.Go:
-		return strings.HasSuffix(f.RelPath, "_test.go")
+		return strings.HasSuffix(base, "_test.go")
+	case lang.Python:
+		base := filepath.Base(base)
+		return strings.HasSuffix(base, "_test.py") || strings.HasPrefix(base, "test_")
+	case lang.TypeScript, lang.JavaScript:
+		for _, marker := range []string{".test.", ".spec."} {
+			idx := strings.Index(base, marker)
+			if idx > 0 {
+				return true
+			}
+		}
 	}
 	return false
 }
