@@ -3,12 +3,12 @@
 **Structural code-quality analysis for your codebase — in one CLI.**
 
 Navune (NAV + UNE, from Latin *nāvis*, "ship/navigate") is a command-line
-analyzer that computes *structural quality* metrics for Go
-codebases: size, cyclomatic complexity, duplication, internal dependency
-graphs, cyclic dependencies, and Martin's coupling metrics. It judges the
-result against configurable budgets and emits a transparent 0–100 composite
-score. Additional languages (TypeScript/JavaScript, Python, C, C++) are on
-the roadmap via build-tagged tree-sitter support.
+analyzer that computes *structural quality* metrics for Go,
+TypeScript/JavaScript, and Python codebases: size, cyclomatic complexity,
+duplication, internal dependency graphs, cyclic dependencies, and Martin's
+coupling metrics. It judges the result against configurable budgets and emits
+a transparent 0–100 composite score. Additional languages (C, C++) are on the
+roadmap via tree-sitter.
 
 ```sh
 navune analyze .                  # default text report
@@ -46,28 +46,30 @@ are the domain of language-native tools (`go vet`, `staticcheck`,
   breach an `error`-tier budget and the exit code says so (0 pass, 1 breach,
   2 usage error). The 0–100 composite is a *transparent, documented blend* of
   per-metric distance-from-budget — no opaque industry numerology.
-- **Pure-Go core.** v1 analyzes Go with the standard `go/parser` — zero cgo,
-  clean static builds, cross-compilable, run anywhere. Other languages are
-  added later as build-tagged optional features.
+- **Multi-language.** Go (via `go/parser`), TypeScript/JavaScript and Python
+  (via the official tree-sitter Go bindings) feed the same uniform element
+  model. Building requires cgo and a C toolchain.
 - **Machine contracts.** A versioned JSON schema is the primary integration
   surface; a Mermaid exporter renders the dependency graph (cycles visible in
   your editor) for free.
 
 ## Language support
 
-| Language            | Backend                    | Status |
-|---------------------|----------------------------|--------|
-| Go                  | `go/parser` (pure Go)      | v1     |
-| TypeScript/JavaScript | tree-sitter (cgo)         | planned |
-| Python              | tree-sitter (cgo)          | planned |
-| C                   | tree-sitter (cgo)          | planned |
-| C++                 | tree-sitter (cgo)          | planned |
+| Language              | Backend                   | Status |
+|-----------------------|---------------------------|--------|
+| Go                    | `go/parser` (pure Go)     | v1     |
+| TypeScript/JavaScript | tree-sitter (cgo)         | v1.1   |
+| Python                | tree-sitter (cgo)         | v1.1   |
+| C                     | tree-sitter (cgo)         | planned |
+| C++                   | tree-sitter (cgo)         | planned |
 
-> Why not more languages in v1? The TS/JS parser in esbuild is internal and
-> cannot be imported, and no importable pure-Go TypeScript parser exists (see
-> [ADR 0007](docs/adr/0007-parsing-backend-cgo.md)). Post-v1 languages require
-> a `cgo`-enabled build and are compiled in via build tags; without them the
-> tool still builds and runs with full Go support.
+> Why tree-sitter (and cgo)? No importable pure-Go TypeScript parser exists
+> (esbuild's parser is `internal/` to its module), and tree-sitter's Go
+> bindings — runtime and grammars — require cgo. See
+> [ADR 0007](docs/adr/0007-parsing-backend-cgo.md). For TS/JS and Python,
+> import/dependency resolution is workspace-root best-effort: relative
+> specifiers and dotted modules that map to an analyzed file are internal;
+> everything else (node_modules, site-packages, bare packages) is external.
 
 ## What counts as "the codebase"
 
@@ -146,7 +148,8 @@ The repository follows the [golang-standards project layout](https://github.com/
 ```
 cmd/navune             CLI entry point (analyze / init / version)
 internal/              private application & analysis code (not importable by others)
-  analysis             pipeline orchestration; summary aggregation; stable Report model
+  analysis             pipeline orchestration; summary aggregation; import
+                       resolution for scripts; stable Report model
   config               navune.yaml parsing, defaults, budgets, weights, exclusions
   discover             file walking, exclusions, nested-module detection, go.mod lookup
   dup                  token-normalized duplication detection (cross-file + intra-file)
@@ -155,31 +158,39 @@ internal/              private application & analysis code (not importable by ot
                        coupling Ca/Ce, instability/abstractness, main-sequence distance
   lang                 uniform element model (file → type → function); parser interface
   lang/golang          Go adapter over go/parser → element model + normalized tokens
+  lang/treescript      TS/JS adapter over the tree-sitter JS/TS grammars
+  lang/python          Python adapter over the tree-sitter Python grammar
   report               text summary, versioned JSON schema, Mermaid graph export
 configs/               sample navune.yaml configuration
 docs/                  ADRs and the metric glossary (design record)
-test/                  external test data: committed golden fixtures (Go), nested module
+test/                  external test data: committed golden fixtures
+                       (fixture/ Go, fixture-ts/, fixture-py/), nested modules
 ```
 
 Language adapters convert a parsed AST into Navune's uniform element model and
 a normalized token stream, so the entire metric/graph/report pipeline is
-written once and reused by every future language.
+written once and reused by every language. TS/JS and Python use the official
+tree-sitter Go bindings (cgo); import resolution for them is workspace-root
+best-effort (`internal/analysis/resolve.go`).
 
 ### Repository layout notes
 
 - `internal/` holds all Go packages; they are private by compiler enforcement.
-- `test/` contains `fixture/`, a self-contained Go module used as golden test
-  data. Being a nested module (`go.mod` inside), it is excluded from `go
-  build ./...`, `go test ./...`, and Navune's own analysis runs, exactly like
-  the Go toolchain skips nested modules.
+- `test/` contains `fixture/` (Go), `fixture-ts/`, and `fixture-py/`, each a
+  self-contained module used as golden test data. Being nested modules
+  (`go.mod` inside), they are excluded from `go build ./...`, `go test
+  ./...`, and Navune's own analysis runs, exactly like the Go toolchain skips
+  nested modules.
 - `configs/navune.yaml.example` documents a full configuration file.
+- Building requires cgo and a C toolchain (tree-sitter); see
+  [ADR 0007](docs/adr/0007-parsing-backend-cgo.md).
 
 ## Roadmap
 
 - **v1** — Go, full metric model including duplication.
+- **v1.1** — TypeScript/JavaScript + Python via tree-sitter.
 - **v1.x** — HTML report; directory-level aggregation views.
-- **later milestones** — TypeScript/JavaScript, then Python, then C/C++ via
-  build-tagged tree-sitter.
+- **later milestones** — C, then C++ via tree-sitter.
 
 ## Development
 
@@ -190,10 +201,11 @@ make vet      # or: go vet ./...
 make analyze  # run Navune on its own source tree
 ```
 
-Verification is golden-test based: committed synthetic Go fixtures under
-`test/fixture/` cover every metric family, and Navune analyzes its own source
-tree as an always-on smoke test. Performance is a CI contract (~<30 s for a
-100–500k LOC repo, parallelized across files).
+Verification is golden-test based: committed synthetic fixtures under
+`test/fixture/` (Go), `test/fixture-ts/`, and `test/fixture-py/` cover every
+metric family across languages, and Navune analyzes its own source tree as an
+always-on smoke test. Performance is a CI contract (~<30 s for a 100–500k LOC
+repo, parallelized across files).
 
 ## Design record
 

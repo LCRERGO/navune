@@ -57,13 +57,17 @@ formulas behind every number Navune reports.
 - **Language adapter** — the layer translating a parsed AST into Navune's
   uniform element model (file → type → function) plus token stream. One per
   language (ADR 0006).
-- **Pure-Go backend** — parser compiled in always: `go/parser` for Go (v1).
-  No cgo, portable, static builds.
-- **cgo/tree-sitter backend** — build-tagged optional support for TS/JS,
-  Python, C/C++, etc. (ADR 0007).
+- **Pure-Go adapter** — `go/parser` for Go. No cgo.
+- **tree-sitter adapter** — tree-sitter grammar-driven adapters for TS/JS and
+  Python (`internal/lang/treescript`, `internal/lang/python`). Require cgo;
+  compiled in by default (ADR 0007).
 - **navune.yaml** — configuration: exclusions, budgets, composite weights,
   severity tiers. Discovered upward from the analyze target; `navune init`
   scaffolds it.
+- **Workspace-root import resolution** — for TS/JS and Python, an import is
+  internal only if it resolves to an analyzed file under the analysis root
+  (relative specifiers / dotted modules; best-effort). Everything else is
+  external and excluded from metric math (ADR 0010).
 
 ## CLI
 

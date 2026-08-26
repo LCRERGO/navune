@@ -22,27 +22,35 @@ pure-Go parsers exist for TypeScript/JavaScript, Python, C, or C++.
 
 ## Decision
 
-Adopt a **hybrid backend with cgo confined to build tags**:
+Adopt a **tree-sitter backend compiled in by default**:
 
-- Go analysis uses `go/parser`, which is pure Go and always compiled in.
-- TS/JS, Python, C, and C++ use tree-sitter behind `cgo` build-tagged
-  optional features. Without the build tag, the tool builds and runs anywhere
-  with full Go support and the other languages degrade gracefully (their
-  analysis reports as unavailable rather than wrong).
+- Go analysis uses `go/parser` (pure Go).
+- TypeScript/JavaScript and Python use the official tree-sitter Go bindings
+  (runtime `github.com/tree-sitter/go-tree-sitter` plus the JS/TS and Python
+  grammar bindings) compiled unconditionally into the binary.
 
-## Revision (2026-09-08)
+## Revision 1 (2026-09-08)
 
 The original decision named esbuild as the TS/JS parser on the strength of its
 "pure Go" parser. That is **not buildable from another module**: esbuild's
 parser is in `internal/js_parser`, and Go's internal-package rule forbids
 importing it outside the esbuild module. There is no importable pure-Go
-TypeScript parser. Consequently TS/JS analysis joins the tree-sitter (cgo)
-track. v1 is Go-only and ships as a pure-Go binary; every other language is a
-`cgo`-tagged optional feature.
+TypeScript parser.
+
+## Revision 2 (2026-09-08)
+
+The pure-Go constraint was lifted: tree-sitter (and therefore cgo) is now
+allowed, and TS/JS + Python ship as first-class languages. Tree-sitter's Go
+bindings require cgo (the runtime and every grammar binding use `#cgo`), so the
+tool now **requires CGO_ENABLED=1 and a C toolchain** for all builds. This
+replaces the earlier "cgo behind build tags / pure-Go core" posture.
 
 ## Consequences
 
-- The v1 core tool is portable: pure-Go static builds for Go analysis.
-- Language support is additive: tree-sitter languages are compile-time opt-in.
+- The whole tool requires cgo: no static/cross builds without a C toolchain.
+- Language support is additive: each grammar is a self-contained adapter over
+  the same element model (ADR 0006).
+- C and C++ remain future milestones; they will reuse the same tree-sitter
+  adapter architecture.
 - Later language milestones only touch the parser adapter layer, not the metric
   pipeline (ADR 0006).

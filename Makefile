@@ -1,7 +1,11 @@
 .PHONY: build test vet fmt checkfmt install analyze clean
 
-build:
-	go build ./...
+BIN := bin/navune
+
+build: $(BIN)
+
+$(BIN): go.mod go.sum $(shell find . -name '*.go' -not -path './test/*')
+	go build -o $(BIN) ./cmd/navune
 
 test:
 	go test ./...
@@ -24,3 +28,4 @@ analyze:
 
 clean:
 	go clean ./...
+	rm -rf bin
