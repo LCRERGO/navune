@@ -1,4 +1,4 @@
-.PHONY: build test vet fmt checkfmt install analyze clean
+.PHONY: build test vet fmt checkfmt install analyze evolve clean
 
 BIN := bin/navune
 
@@ -25,6 +25,11 @@ install:
 # Analyze Navune's own source tree (self-analysis smoke test).
 analyze:
 	go run ./cmd/navune analyze .
+
+# Fixture-evolution tests (opt-in, build tag evolution): staged mutations of
+# tiny multi-language codebases assert metrics move in controlled directions.
+evolve:
+	go test -tags evolution -v ./internal/evolution/...
 
 clean:
 	go clean ./...
