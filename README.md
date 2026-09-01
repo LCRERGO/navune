@@ -17,23 +17,43 @@ navune analyze . --format mermaid --out deps.mmd
 navune init                       # writes a commented navune.yaml
 ```
 
+A real run against a small Python fixture (a 3-file dependency cycle):
+
 ```
-$ navune analyze ./internal/graph
-┌ Modules                                NCLOC  Cyc(avg)  Cyc(worst)  Dup%  In-cycle
-├── internal/graph/graph.go              120       2.3           7   3.2%       yes
-├── internal/graph/graph_test.go          44       1.0           2   0.0%        no
-...
-Cycle: graph.go → graph.go (self)          (break: internal dependency)
-Composite: 84 / 100    Budget: 2 breached (error)   Exit: 1
+$ navune analyze test/fixture-py   [module fixture-py]
+
+Files:  3 production · 1 test · 1 generated skipped · 1 dirs excluded
+Size:   33 physical SLOC · 25 logical LOC
+Types:  2 (0 abstract)
+Complexity:  avg 2.20 / function · worst 3 (pkg/alpha/a.py: helper)
+Duplication: 0 / 212 tokens (0.00%) · 0 blocks
+Cycles:      1 component(s) · 3/3 files in cycle (100.00%) · largest 3
+
+Cyclic dependencies (structural debt):
+  cycle-0 (3 files): pkg/alpha/a.py -> pkg/beta/b.py -> pkg/gamma/c.py
+
+Production files:
+  file                    SLOC  worst    dup%  cycle
+  pkg/alpha/a.py           14      3   0.00%      y
+  pkg/beta/b.py             7      3   0.00%      y
+  pkg/gamma/c.py           12      2   0.00%      y
+
+Quality gate (budgets):
+  [Error] avg_complexity      2.20 / 10.00       ok
+  [Warn] max_in_cycle_pct   100.00 / 10.00  BREACHED
+  ...
+Composite index: 66.1 / 100
+Exit code: 0 (PASS)
 ```
 
 ## Why structural quality?
 
-Navune is deliberately **structural**, not a linter and not a security scanner. It measures how a codebase is *structured* — dependency cycles,
-coupling, complexity, duplication — the properties that determine whether a
-codebase stays maintainable as it grows. Bug hunting and vulnerability scanning
-are the domain of language-native tools (`go vet`, `staticcheck`,
-`govulncheck`) and Navune does not try to replace them.
+Navune is deliberately **structural**, not a linter and not a security scanner.
+It measures how a codebase is *structured* — dependency cycles, coupling,
+complexity, duplication — the properties that determine whether a codebase
+stays maintainable as it grows. Bug hunting and vulnerability scanning are the
+domain of language-native tools (`go vet`, `staticcheck`, `govulncheck`) and
+Navune does not try to replace them.
 
 ## Highlights
 
@@ -43,7 +63,7 @@ are the domain of language-native tools (`go vet`, `staticcheck`,
   duplication, dependency cycles (SCCs), Ca/Ce → instability, abstractness,
   and distance from the main sequence.
 - **Budgets first, composite second.** `navune.yaml` defines per-metric limits;
-  breach an `error`-tier budget and the exit code says so (0 pass, 1 breach,
+  breach an `error`-tier budget and the exit code says so (0 pass · 1 breach ·
   2 usage error). The 0–100 composite is a *transparent, documented blend* of
   per-metric distance-from-budget — no opaque industry numerology.
 - **Multi-language.** Go (via `go/parser`), TypeScript/JavaScript and Python
@@ -78,12 +98,19 @@ are the domain of language-native tools (`go vet`, `staticcheck`,
   overridable in config.
 - **Test files are analyzed but kept in a separate `tests` namespace** — visible
   in reports, excluded from budgets, cycles, coupling, and the composite.
-- **Only internal edges count** toward metrics and gates. External imports
-  (stdlib, third-party) are recorded and shown as fan-out, never in the math.
+- **Only internal edges count** toward metrics and gates. Imports that do not
+  resolve to an analyzed file (stdlib, `node_modules`, site-packages) never
+  become graph edges.
 
 ## Install
 
+Building requires Go 1.27+, cgo, and a C toolchain (tree-sitter grammar
+bindings). From source:
+
 ```sh
+git clone git@codeberg.org:LCRERGO/Navune.git
+make build          # produces ./bin/navune
+# or
 go install github.com/lcr/navune/cmd/navune@latest
 ```
 
@@ -97,7 +124,8 @@ navune version            # print version and supported languages
 
 `navune analyze` auto-discovers `navune.yaml` by walking upward from `<path>`;
 `--config` overrides discovery. Exit codes: **0** pass · **1** budget breach
-(error tier) · **2** usage/configuration error.
+(error tier) · **2** usage/configuration error · **3** internal error (e.g. an
+unparseable source file).
 
 ## Configuration (`navune.yaml`)
 
@@ -105,26 +133,25 @@ navune version            # print version and supported languages
 version: 1
 
 exclude:            # extra globs on top of built-in patterns
-  - "**/legacy/**"
-
-tests:
-  include: []       # extra test-file patterns; built-ins are language-aware
+  - "legacy"
+  - "**/migrations/**"
 
 budgets:            # per-metric limits; tier sets severity (error|warn)
   avg_complexity:        { limit: 10,  tier: error }
   worst_complexity:      { limit: 50,  tier: error }
-  max_duplication_pct:   { limit: 5.0, tier: warn }
+  max_duplication_pct:   { limit: 5,   tier: warn }
   max_cycle_members:     { limit: 8,   tier: error }
   max_in_cycle_pct:      { limit: 10,  tier: warn }
 
-weights:            # composite blend, weights per metric (see formula below)
+weights:            # composite blend; every budgeted metric may be weighted
   avg_complexity:        25
+  worst_complexity:      15
   max_duplication_pct:   20
-  max_in_cycle_pct:      25
-  ...
+  max_cycle_members:     20
+  max_in_cycle_pct:      20
 ```
 
-Run `navune init` to get the full commented template.
+Run `navune init` to write this commented template to your project root.
 
 ## The composite index (transparent by design)
 

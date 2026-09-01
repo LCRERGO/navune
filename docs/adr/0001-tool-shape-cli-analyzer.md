@@ -9,8 +9,9 @@
 Quality-analysis tooling comes in two broad shapes: long-running servers with
 history storage, a web dashboard, and quality-gate orchestration; or
 IDE/tooling-centric products. Building "one of those" could mean a daemon with
-persistence and a UI, or a self-contained analyzer. A server's storage/history/UI problem dwarfs the
-analysis problem itself and would bury the interesting part.
+persistence and a UI, or a self-contained analyzer. A server's
+storage/history/UI problem dwarfs the analysis problem itself and would bury
+the interesting part.
 
 ## Decision
 

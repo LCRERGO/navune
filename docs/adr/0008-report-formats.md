@@ -7,9 +7,9 @@
 ## Context
 
 A structural-quality tool's value proposition is visual — you *see* the cycle
-in a diagram. A CLI has no window. The audience constraint (ADR 0004) demands a stable machine
-contract; the structural-quality ambition (ADR 0003) demands the cycles be
-visible somehow.
+in a diagram. A CLI has no window. The audience constraint (ADR 0004) demands a
+stable machine contract; the structural-quality ambition (ADR 0003) demands the
+cycles be visible somehow.
 
 ## Decision
 
