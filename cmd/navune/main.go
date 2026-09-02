@@ -19,24 +19,100 @@ func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
-func usage() string {
-	return `Navune — structural code-quality analysis.
+// helpText is the top-level help shown by `navune help` (and on usage errors).
+func helpText() string {
+	return `Navune — structural code-quality analysis in one CLI.
 
 Usage:
-  navune analyze <path> [--config file] [--format text|json|mermaid] [--out file]
-  navune init    [path]     write a commented navune.yaml template
-  navune version            print version and supported languages
+  navune <command> [arguments]
+
+Commands:
+  analyze     Measure a codebase's structural quality against budgets
+  init        Write a commented navune.yaml template
+  version     Print version and supported languages
+  help        Show help for a command
+
+Run "navune help <command>" or "navune <command> --help" for details.
+
+Examples:
+  navune analyze .                    analyze the current directory
+  navune analyze ./src --format json
+  navune analyze . --format mermaid --out deps.mmd
+  navune init
 
 Exit codes:
   0  pass (all error-tier budgets satisfied)
   1  breach (at least one error-tier budget exceeded)
   2  usage or configuration error
+  3  internal error (e.g. a source file could not be parsed)
+
+Full reference: docs/usage.md in this repository.
 `
+}
+
+// helpFor returns per-command help text, or "" for unknown commands.
+func helpFor(cmd string) string {
+	switch cmd {
+	case "analyze":
+		return `NAME
+  navune analyze — measure a codebase's structural quality
+
+USAGE
+  navune analyze <path> [flags]
+
+ARGUMENTS
+  <path>          directory to analyze (default ".")
+
+FLAGS
+  --config FILE   navune.yaml to use; overrides upward discovery from <path>
+  --format FMT    report format: text (default), json, or mermaid
+  --out FILE      also write the report to FILE
+
+DESCRIPTION
+  Analyzes the codebase at <path>, measures size, cyclomatic complexity,
+  duplication, dependency cycles and coupling, evaluates budgets, and prints
+  a report. Exit code 1 signals an error-tier budget breach; exit code 3
+  signals an internal error (see "navune help" for all exit codes).
+
+EXAMPLES
+  navune analyze .
+  navune analyze ./src --format json
+  navune analyze . --config navune.yaml --format mermaid --out deps.mmd
+`
+	case "init":
+		return `NAME
+  navune init — write a commented navune.yaml template
+
+USAGE
+  navune init [path]
+
+ARGUMENTS
+  [path]          directory to write navune.yaml into (default ".")
+
+DESCRIPTION
+  Scaffolds a commented configuration file with the built-in budgets and
+  weights. Fails if navune.yaml already exists in the directory.
+
+EXAMPLES
+  navune init
+  navune init ./services/api
+`
+	case "version":
+		return `NAME
+  navune version — print version, platform and supported languages
+
+USAGE
+  navune version
+`
+	case "help":
+		return helpText()
+	}
+	return ""
 }
 
 func run(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprint(os.Stderr, usage())
+		fmt.Fprint(os.Stderr, helpText())
 		return gate.ExitUsage
 	}
 	switch args[0] {
@@ -47,12 +123,26 @@ func run(args []string) int {
 	case "version", "--version", "-v":
 		return runVersion()
 	case "help", "--help", "-h":
-		fmt.Print(usage())
-		return gate.ExitPass
+		return runHelp(args[1:])
 	default:
-		fmt.Fprintf(os.Stderr, "navune: unknown command %q\n\n%s", args[0], usage())
+		fmt.Fprintf(os.Stderr, "navune: unknown command %q\n\n%s", args[0], helpText())
 		return gate.ExitUsage
 	}
+}
+
+// runHelp implements `navune help [command]`.
+func runHelp(args []string) int {
+	if len(args) == 0 {
+		fmt.Print(helpText())
+		return gate.ExitPass
+	}
+	h := helpFor(args[0])
+	if h == "" {
+		fmt.Fprintf(os.Stderr, "navune: unknown command %q\n\n%s", args[0], helpText())
+		return gate.ExitUsage
+	}
+	fmt.Print(h)
+	return gate.ExitPass
 }
 
 type analyzeOpts struct {
@@ -98,7 +188,7 @@ func parseAnalyze(args []string) (*analyzeOpts, int, error) {
 			}
 			opts.out = v
 		case "-h", "--help":
-			fmt.Print(usage())
+			fmt.Print(helpFor("analyze"))
 			return nil, gate.ExitPass, errHelp
 		default:
 			if opts.path != "" {
@@ -125,7 +215,7 @@ func runAnalyze(args []string) int {
 		if err == errHelp {
 			return gate.ExitPass
 		}
-		fmt.Fprintf(os.Stderr, "navune analyze: %v\n", err)
+		fmt.Fprintf(os.Stderr, "navune analyze: %v\n\n%s", err, helpFor("analyze"))
 		return gate.ExitUsage
 	}
 
@@ -164,12 +254,16 @@ func runAnalyze(args []string) int {
 }
 
 func runInit(args []string) int {
+	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
+		fmt.Print(helpFor("init"))
+		return gate.ExitPass
+	}
 	dir := "."
 	if len(args) > 0 {
 		dir = args[0]
 	}
 	if len(args) > 1 {
-		fmt.Fprintf(os.Stderr, "navune init: too many arguments\n")
+		fmt.Fprintf(os.Stderr, "navune init: too many arguments\n\n%s", helpFor("init"))
 		return gate.ExitUsage
 	}
 	abs, err := filepath.Abs(dir)
