@@ -95,3 +95,56 @@ func TestBadFormatIsUsageError(t *testing.T) {
 		t.Fatalf("bad format want exit %d, got %d", gate.ExitUsage, code)
 	}
 }
+
+func TestHelpRoot(t *testing.T) {
+	for _, args := range [][]string{{"help"}, {"--help"}, {"-h"}} {
+		code, out := runCLI(t, ".", args...)
+		if code != gate.ExitPass {
+			t.Errorf("%v exit want 0, got %d", args, code)
+		}
+		for _, want := range []string{"analyze", "init", "version", "Exit codes", "navune help <command>"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%v output should contain %q", args, want)
+			}
+		}
+	}
+}
+
+func TestHelpForEachCommand(t *testing.T) {
+	for _, cmd := range []string{"analyze", "init", "version", "help"} {
+		code, out := runCLI(t, ".", "help", cmd)
+		if code != gate.ExitPass {
+			t.Errorf("help %s exit want 0, got %d", cmd, code)
+		}
+		if !strings.Contains(out, "navune "+cmd) {
+			t.Errorf("help %s should describe the command, got:\n%s", cmd, out)
+		}
+	}
+	// --help on a subcommand renders the same per-command help
+	code, out := runCLI(t, ".", "analyze", "--help")
+	if code != gate.ExitPass {
+		t.Errorf("analyze --help exit want 0, got %d", code)
+	}
+	for _, want := range []string{"--format FMT", "--out FILE", "EXAMPLES", "navune analyze ."} {
+		if !strings.Contains(out, want) {
+			t.Errorf("analyze --help should contain %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestHelpUnknownTopicIsUsageError(t *testing.T) {
+	code, _ := runCLI(t, ".", "help", "bogus")
+	if code != gate.ExitUsage {
+		t.Fatalf("help bogus want exit %d, got %d", gate.ExitUsage, code)
+	}
+}
+
+func TestNoArgsPrintsHelpToStderr(t *testing.T) {
+	code, out := runCLI(t, ".")
+	if code != gate.ExitUsage {
+		t.Fatalf("no args want exit %d, got %d", gate.ExitUsage, code)
+	}
+	if !strings.Contains(out, "Usage:") {
+		t.Errorf("no-args output should include usage, got:\n%s", out)
+	}
+}
