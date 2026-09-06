@@ -10,11 +10,36 @@ coupling metrics. It judges the result against configurable budgets and emits
 a transparent 0–100 composite score. Additional languages (C, C++) are on the
 roadmap via tree-sitter.
 
+- [Quickstart](#quickstart)
+- [Why structural quality?](#why-structural-quality)
+- [Features](#features)
+- [Language support](#language-support)
+- [Output formats](#output-formats)
+- [Configuration](#configuration-navuneyaml)
+- [The composite index](#the-composite-index-transparent-by-design)
+- [What counts as "the codebase"](#what-counts-as-the-codebase)
+- [Documentation](#documentation)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Roadmap](#roadmap)
+- [Design record](#design-record)
+
+## Quickstart
+
+Requires Go 1.27+, cgo, and a C toolchain (tree-sitter grammar bindings).
+
 ```sh
-navune analyze .                  # default text report
-navune analyze ./src --format json
-navune analyze . --format mermaid --out deps.mmd
-navune init                       # writes a commented navune.yaml
+# From source (or: go install github.com/lcr/navune/cmd/navune@latest)
+git clone git@codeberg.org:LCRERGO/Navune.git && cd Navune
+make build            # produces ./bin/navune
+
+# Analyze a codebase.
+./bin/navune analyze .                      # default text report
+./bin/navune analyze ./src --format json    # machine-readable
+./bin/navune analyze . --format mermaid --out deps.mmd
+
+# Create a project config, then gate your CI on the exit code.
+./bin/navune init
 ```
 
 A real run against a small Python fixture (a 3-file dependency cycle):
@@ -46,6 +71,9 @@ Composite index: 66.1 / 100
 Exit code: 0 (PASS)
 ```
 
+The full CLI reference — commands, flags, examples, exit codes — is in
+[`docs/usage.md`](docs/usage.md).
+
 ## Why structural quality?
 
 Navune is deliberately **structural**, not a linter and not a security scanner.
@@ -55,13 +83,14 @@ stays maintainable as it grows. Bug hunting and vulnerability scanning are the
 domain of language-native tools (`go vet`, `staticcheck`, `govulncheck`) and
 Navune does not try to replace them.
 
-## Highlights
+## Features
 
 - **Unit of analysis is the file, in every language** — one uniform element
   model (`file → type/class → function/method`), one metric pipeline.
-- **Full v1 metric set**: physical & logical SLOC, cyclomatic complexity,
+- **Full metric set**: physical & logical SLOC, cyclomatic complexity,
   duplication, dependency cycles (SCCs), Ca/Ce → instability, abstractness,
-  and distance from the main sequence.
+  and distance from the main sequence. See
+  [`docs/metrics.md`](docs/metrics.md).
 - **Budgets first, composite second.** `navune.yaml` defines per-metric limits;
   breach an `error`-tier budget and the exit code says so (0 pass · 1 breach ·
   2 usage error). The 0–100 composite is a *transparent, documented blend* of
@@ -72,6 +101,8 @@ Navune does not try to replace them.
 - **Machine contracts.** A versioned JSON schema is the primary integration
   surface; a Mermaid exporter renders the dependency graph (cycles visible in
   your editor) for free.
+- **Deterministic.** Report output is stable and ordered — suitable as a
+  regression signal in CI.
 
 ## Language support
 
@@ -91,41 +122,28 @@ Navune does not try to replace them.
 > specifiers and dotted modules that map to an analyzed file are internal;
 > everything else (node_modules, site-packages, bare packages) is external.
 
-## What counts as "the codebase"
+## Output formats
 
-- **Generated & vendored code is skipped** (`vendor/`, `node_modules/`,
-  `*.pb.go`, `*.min.js`, lockfiles, …) with sensible built-in patterns,
-  overridable in config.
-- **Test files are analyzed but kept in a separate `tests` namespace** — visible
-  in reports, excluded from budgets, cycles, coupling, and the composite.
-- **Only internal edges count** toward metrics and gates. Imports that do not
-  resolve to an analyzed file (stdlib, `node_modules`, site-packages) never
-  become graph edges.
+`navune analyze --format <text|json|mermaid>`:
 
-## Install
+- **text** (default) — the human-readable summary shown in the quickstart.
+- **json** — a stable, versioned schema (`schema_version: 1`), the machine
+  contract for CI and other tools.
+- **mermaid** — a `flowchart` of the internal dependency graph. Files that
+  participate in a cycle are grouped into per-cycle subgraphs, so structural
+  debt is visible in your editor:
 
-Building requires Go 1.27+, cgo, and a C toolchain (tree-sitter grammar
-bindings). From source:
-
-```sh
-git clone git@codeberg.org:LCRERGO/Navune.git
-make build          # produces ./bin/navune
-# or
-go install github.com/lcr/navune/cmd/navune@latest
+```mermaid
+flowchart LR
+  subgraph cycle0["cycle-0 · 3 files"]
+    f_pkg_alpha_a_py["alpha/a.py"]
+    f_pkg_beta_b_py["beta/b.py"]
+    f_pkg_gamma_c_py["gamma/c.py"]
+  end
+  f_pkg_alpha_a_py --> f_pkg_beta_b_py
+  f_pkg_beta_b_py --> f_pkg_gamma_c_py
+  f_pkg_gamma_c_py --> f_pkg_alpha_a_py
 ```
-
-## Usage
-
-```
-navune analyze <path> [--config file] [--format text|json|mermaid] [--out file]
-navune init    [path]     # write a commented navune.yaml template
-navune version            # print version and supported languages
-```
-
-`navune analyze` auto-discovers `navune.yaml` by walking upward from `<path>`;
-`--config` overrides discovery. Exit codes: **0** pass · **1** budget breach
-(error tier) · **2** usage/configuration error · **3** internal error (e.g. an
-unparseable source file).
 
 ## Configuration (`navune.yaml`)
 
@@ -152,6 +170,8 @@ weights:            # composite blend; every budgeted metric may be weighted
 ```
 
 Run `navune init` to write this commented template to your project root.
+`navune analyze` auto-discovers `navune.yaml` by walking upward from the
+analyzed path; `--config` overrides discovery.
 
 ## The composite index (transparent by design)
 
@@ -168,12 +188,36 @@ Every number in the report is traceable to a formula and a config line. The
 budget is the anchor; breach one and the exit code flips regardless of the
 composite — budgets decide, the composite informs.
 
+## What counts as "the codebase"
+
+- **Generated & vendored code is skipped** (`vendor/`, `node_modules/`,
+  `*.pb.go`, `*.min.js`, lockfiles, …) with sensible built-in patterns,
+  overridable in config.
+- **Test files are analyzed but kept in a separate `tests` namespace** — visible
+  in reports, excluded from budgets, cycles, coupling, and the composite.
+- **Only internal edges count** toward metrics and gates. Imports that do not
+  resolve to an analyzed file (stdlib, `node_modules`, site-packages) never
+  become graph edges.
+
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [`docs/usage.md`](docs/usage.md) | Full CLI reference: commands, flags, exit codes, examples. |
+| [`docs/metrics.md`](docs/metrics.md) | Per-metric definitions, formulas, budget keys and defaults. |
+| [`docs/glossary.md`](docs/glossary.md) | Shared vocabulary; metric definitions are authoritative here. |
+| [`docs/development.md`](docs/development.md) | Contributor guide: pipeline, invariants, extending languages. |
+| [`docs/adr/`](docs/adr/) | The design record behind every decision. |
+
+`navune help` and `navune help <command>` reproduce the essentials at the
+terminal.
+
 ## Architecture
 
 The repository follows the [golang-standards project layout](https://github.com/golang-standards/project-layout).
 
 ```
-cmd/navune             CLI entry point (analyze / init / version)
+cmd/navune             CLI entry point (analyze / init / version / help)
 internal/              private application & analysis code (not importable by others)
   analysis             pipeline orchestration; summary aggregation; import
                        resolution for scripts; stable Report model
@@ -189,7 +233,7 @@ internal/              private application & analysis code (not importable by ot
   lang/python          Python adapter over the tree-sitter Python grammar
   report               text summary, versioned JSON schema, Mermaid graph export
 configs/               sample navune.yaml configuration
-docs/                  ADRs and the metric glossary (design record)
+docs/                  usage, metrics, glossary, ADRs and contributor guide
 test/                  external test data: committed golden fixtures
                        (fixture/ Go, fixture-ts/, fixture-py/), nested modules
 ```
@@ -212,27 +256,25 @@ best-effort (`internal/analysis/resolve.go`).
 - Building requires cgo and a C toolchain (tree-sitter); see
   [ADR 0007](docs/adr/0007-parsing-backend-cgo.md).
 
-## Roadmap
-
-- **v1** — Go, full metric model including duplication.
-- **v1.1** — TypeScript/JavaScript + Python via tree-sitter.
-- **v1.x** — HTML report; directory-level aggregation views.
-- **later milestones** — C, then C++ via tree-sitter.
-
 ## Development
 
 ```sh
 make build    # or: go build ./...
 make test     # or: go test ./...
 make vet      # or: go vet ./...
+make evolve   # opt-in fixture-evolution suite (-tags evolution)
 make analyze  # run Navune on its own source tree
 ```
 
-Verification is golden-test based: committed synthetic fixtures under
-`test/fixture/` (Go), `test/fixture-ts/`, and `test/fixture-py/` cover every
-metric family across languages, and Navune analyzes its own source tree as an
-always-on smoke test. Performance is a CI contract (~<30 s for a 100–500k LOC
-repo, parallelized across files).
+See [`docs/development.md`](docs/development.md) and
+[`AGENTS.md`](AGENTS.md) for contributor guidance.
+
+## Roadmap
+
+- **v1** — Go, full metric model including duplication.
+- **v1.1** — TypeScript/JavaScript + Python via tree-sitter.
+- **v1.x** — HTML report; directory-level aggregation views.
+- **later milestones** — C, then C++ via tree-sitter.
 
 ## Design record
 
