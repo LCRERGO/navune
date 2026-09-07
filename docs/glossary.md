@@ -72,6 +72,6 @@ formulas behind every number Navune reports.
 ## CLI
 
 - **Exit codes** — 0 pass; 1 budget breach (error tier); 2 usage/config error;
-  3+ reserved (ADR 0012).
+  3 internal error (4+ reserved) (ADR 0012).
 - **Text / JSON / Mermaid** — the three output formats of `navune analyze`
   (ADR 0008). JSON is the versioned machine contract.
