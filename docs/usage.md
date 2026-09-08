@@ -28,7 +28,7 @@ report to stdout.
 |-----------------|-----------------------------------------------------------------|
 | `--config FILE` | Use `FILE` instead of discovering `navune.yaml` upward from the target. |
 | `--format FMT`  | Output format: `text` (default), `json`, or `mermaid`.          |
-| `--out FILE`    | Also write the report to `FILE`.                                |
+| `--out FILE`    | Write the report to `FILE` instead of stdout.                     |
 
 Exit code reflects the quality gate: see [Exit codes](#exit-codes).
 

@@ -96,6 +96,21 @@ func TestBadFormatIsUsageError(t *testing.T) {
 	}
 }
 
+func TestOutWritesFileWithoutEcho(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "report.json")
+	code, stdout := runCLI(t, "..", "analyze", ".", "--format", "json", "--out", out)
+	if code != gate.ExitPass {
+		t.Fatalf("analyze with --out want exit 0, got %d", code)
+	}
+	if stdout != "" {
+		t.Errorf("with --out, report must not be echoed to stdout, got:\n%s", stdout)
+	}
+	if b, err := os.ReadFile(out); err != nil || !strings.Contains(string(b), `"schema_version": 1`) {
+		t.Errorf("report file missing or invalid: %v", err)
+	}
+}
+
 func TestHelpRoot(t *testing.T) {
 	for _, args := range [][]string{{"help"}, {"--help"}, {"-h"}} {
 		code, out := runCLI(t, ".", args...)

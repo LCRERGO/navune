@@ -66,7 +66,7 @@ ARGUMENTS
 FLAGS
   --config FILE   navune.yaml to use; overrides upward discovery from <path>
   --format FMT    report format: text (default), json, or mermaid
-  --out FILE      also write the report to FILE
+  --out FILE      write the report to FILE instead of stdout
 
 DESCRIPTION
   Analyzes the codebase at <path>, measures size, cyclomatic complexity,
@@ -246,10 +246,9 @@ func runAnalyze(args []string) int {
 			fmt.Fprintf(os.Stderr, "navune: %v\n", err)
 			return gate.ExitInternal
 		}
-		fmt.Println(out) // keep stdout useful too
-	} else {
-		fmt.Println(out)
+		return rpt.ExitCode
 	}
+	fmt.Println(out)
 	return rpt.ExitCode
 }
 
