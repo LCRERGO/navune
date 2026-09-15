@@ -1,0 +1,166 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: make checkfmt
+      - name: vet
+        run: make vet
+      - name: test
+        run: make test
+
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(git describe --tags --always --dirty)"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [gate, prepare]
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            binary: navune
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            binary: navune
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            binary: navune
+          - runner: macos-latest
+            goos: darwin
+            goarch: amd64
+            binary: navune
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            binary: navune.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: build
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          go build -trimpath \
+            -ldflags "-X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.builtBy=github-actions" \
+            -o "${{ matrix.binary }}" ./cmd/navune
+      - uses: actions/upload-artifact@v4
+        with:
+          name: navune-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ matrix.binary }}
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: navune-*
+          path: artifacts
+      - name: package
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p release
+          for dir in artifacts/navune-*; do
+            target="$(basename "$dir")"
+            os_arch="${target#navune-}"
+            os="${os_arch%-*}"
+            arch="${os_arch##*-}"
+            if [[ "$os" == "windows" ]]; then
+              binary="navune.exe"
+            else
+              binary="navune"
+            fi
+            mkdir -p "stage/${target}"
+            cp "$dir/${binary}" "stage/${target}/${binary}"
+            cp LICENSE README.md "stage/${target}/"
+            if [[ "$os" == "windows" ]]; then
+              (cd "stage/${target}" && zip -q "../../release/navune_${VERSION}_${os}_${arch}.zip" "${binary}" LICENSE README.md)
+            else
+              tar -czf "release/navune_${VERSION}_${os}_${arch}.tar.gz" -C "stage/${target}" "${binary}" LICENSE README.md
+            fi
+          done
+          (cd release && sha256sum navune_* > checksums.txt)
+          ls -l release
+      - name: release notes
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          awk -v v="${VERSION}" '
+            index($0, "## [" v "]") == 1 { in_section = 1; next }
+            in_section && index($0, "## ") == 1 { exit }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "CHANGELOG.md has no section for ${VERSION}" >&2
+            exit 1
+          fi
+          cat release-notes.md
+      - name: upload dry-run bundle
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: navune-dry-run
+          path: release/*
+      - name: publish
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prerelease=""
+          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
+            prerelease="--prerelease"
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            ${prerelease} \
+            release/*
