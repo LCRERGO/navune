@@ -38,6 +38,26 @@ make evolve     # opt-in fixture-evolution suite (-tags evolution)
 
 cgo is mandatory (tree-sitter grammars); do not try `CGO_ENABLED=0`.
 
+## Releasing
+
+Releases are built and published by GitHub Actions on the GitHub mirror
+(`github.com/LCRERGO/Navune`); the canonical repository stays on Codeberg. See
+[ADR 0014](adr/0014-release-and-ci.md) for the rationale.
+
+To cut a release:
+
+1. Add the version's section to `CHANGELOG.md` (Keep-a-Changelog format, heading
+   `## [<version>]`). The publish job extracts it as the release notes and fails
+   if the section is missing.
+2. Push an annotated tag `v<version>` (e.g. `v0.2.0`). Tags containing a hyphen
+   (`v0.2.0-rc1`) are published as GitHub pre-releases.
+3. CI runs gofmt/vet/test, builds linux/amd64, linux/arm64, darwin/amd64,
+   darwin/arm64, and windows/amd64 natively, then attaches
+   `navune_<version>_<os>_<arch>.tar.gz`/`.zip` and `checksums.txt`.
+
+Run the release workflow manually (`workflow_dispatch`) for a dry-run: it builds
+and packages everything as a workflow artifact but creates no release.
+
 ## Metrics invariants
 
 - **File is the unit of analysis** in every language (ADR 0006).
