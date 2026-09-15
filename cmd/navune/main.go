@@ -13,7 +13,12 @@ import (
 	"github.com/lcr/navune/internal/report"
 )
 
-const version = "0.1.0"
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+	builtBy = "unknown"
+)
 
 func main() {
 	os.Exit(run(os.Args[1:]))
@@ -289,6 +294,7 @@ func runInit(args []string) int {
 
 func runVersion() int {
 	fmt.Printf("navune %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("commit %s built %s by %s\n", commit, date, builtBy)
 	fmt.Println("languages: go, typescript, javascript, python")
 	return gate.ExitPass
 }
