@@ -77,7 +77,7 @@ export function f(x: number): number {
 	}
 }
 
-func TestNestedClosureDoesNotInflate(t *testing.T) {
+func TestNestedClosureIsSeparateUnit(t *testing.T) {
 	src := `export function outer() {
   const inner = (a) => {
     if (a) { console.log(a); }
@@ -90,11 +90,72 @@ func TestNestedClosureDoesNotInflate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Functions) != 1 {
-		t.Fatalf("closures are not separate units: want 1 fn, got %d", len(res.Functions))
+	if len(res.Functions) != 2 {
+		t.Fatalf("closures are separate units (ADR 0015): want 2 fn, got %d", len(res.Functions))
 	}
 	if res.Functions[0].Complexity != 1 {
 		t.Errorf("outer complexity should be 1 (closure skipped), got %d", res.Functions[0].Complexity)
+	}
+	anon := res.Functions[1]
+	if !anon.Anonymous {
+		t.Errorf("second function should be anonymous, got %q", anon.Name)
+	}
+	if anon.Complexity != 3 { // base + if + ternary
+		t.Errorf("closure complexity want 3 got %d", anon.Complexity)
+	}
+	if anon.Params != 1 {
+		t.Errorf("closure params want 1 got %d", anon.Params)
+	}
+}
+
+func TestExtendedMeasures(t *testing.T) {
+	src := `// a significant comment
+// *****
+export function complex(a, b, n) {
+  if (a && b) {
+    for (let i = 0; i < n; i++) {
+      if (i > 1) { return i; }
+    }
+  } else if (b) {
+    return 1;
+  } else {
+    return 2;
+  }
+  return 0;
+}
+function rec(n) {
+  if (n <= 1) { return n; }
+  return rec(n - 1);
+}
+`
+	res, err := NewJS().Parse("a.js", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]lang.Function{}
+	for _, f := range res.Functions {
+		byName[f.Name] = f
+	}
+	cx := byName["complex"]
+	if cx.Params != 3 {
+		t.Errorf("params want 3 got %d", cx.Params)
+	}
+	// if(+1) + &&(+1) + for(+2) + inner if(+3) + else-if(+1) + else(+1) = 9
+	if cx.Cognitive != 9 {
+		t.Errorf("cognitive want 9 got %d", cx.Cognitive)
+	}
+	if cx.Nesting != 3 {
+		t.Errorf("nesting want 3 got %d", cx.Nesting)
+	}
+	rec := byName["rec"]
+	if rec.Cognitive != 2 {
+		t.Errorf("rec cognitive want 2 got %d", rec.Cognitive)
+	}
+	if len(rec.Calls) != 1 || rec.Calls[0] != "rec" {
+		t.Errorf("rec calls want [rec], got %v", rec.Calls)
+	}
+	if res.CommentLines != 1 {
+		t.Errorf("comment lines want 1 got %d", res.CommentLines)
 	}
 }
 

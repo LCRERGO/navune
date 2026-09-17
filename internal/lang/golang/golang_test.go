@@ -81,7 +81,7 @@ func f(a, b, c bool) bool {
 	}
 }
 
-func TestNestedClosureDoesNotInflateParent(t *testing.T) {
+func TestNestedClosureIsSeparateFunction(t *testing.T) {
 	src := `package x
 
 func outer() {
@@ -97,11 +97,95 @@ func outer() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Functions) != 1 {
-		t.Fatalf("closures are not separate v1 functions, want 1, got %d", len(res.Functions))
+	if len(res.Functions) != 2 {
+		t.Fatalf("closures are separate functions (ADR 0015), want 2, got %d", len(res.Functions))
 	}
 	if res.Functions[0].Complexity != 1 {
 		t.Errorf("outer complexity want 1 (closure skipped), got %d", res.Functions[0].Complexity)
+	}
+	anon := res.Functions[1]
+	if !anon.Anonymous {
+		t.Errorf("second function should be anonymous, got %q", anon.Name)
+	}
+	if anon.Complexity != 2 {
+		t.Errorf("closure complexity want 2, got %d", anon.Complexity)
+	}
+}
+
+func TestExtendedMeasures(t *testing.T) {
+	src := `package x
+
+// doc
+func complex(a, b bool, n int) int {
+	if a && b {
+		for i := 0; i < n; i++ {
+			if i > 1 {
+				return i
+			}
+		}
+	} else if b {
+		return 1
+	} else {
+		return 2
+	}
+	return 0
+}
+
+func rec(n int) int {
+	if n <= 1 {
+		return n
+	}
+	return rec(n-1)
+}
+`
+	res, err := New().Parse("x.go", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]lang.Function{}
+	for _, f := range res.Functions {
+		byName[f.Name] = f
+	}
+	cx := byName["complex"]
+	if cx.Params != 3 {
+		t.Errorf("params want 3 got %d", cx.Params)
+	}
+	// if(+1) + &&(+1) + for(+2, nesting 1) + inner if(+3, nesting 2) + else-if(+1) + else(+1) = 9
+	if cx.Cognitive != 9 {
+		t.Errorf("cognitive want 9 got %d", cx.Cognitive)
+	}
+	if cx.Nesting != 3 {
+		t.Errorf("nesting want 3 got %d", cx.Nesting)
+	}
+	if cx.Length == 0 {
+		t.Errorf("length should be > 0")
+	}
+	rec := byName["rec"]
+	if rec.Cognitive != 2 { // if(+1) + recursion(+1)
+		t.Errorf("rec cognitive want 2 got %d", rec.Cognitive)
+	}
+	if len(rec.Calls) != 1 || rec.Calls[0] != "rec" {
+		t.Errorf("rec calls want [rec], got %v", rec.Calls)
+	}
+}
+
+func TestCommentLines(t *testing.T) {
+	src := `package x
+
+// significant comment
+// *****
+//
+/* block
+ * significant
+ */
+func f() {}
+`
+	res, err := New().Parse("x.go", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.CommentLines != 3 {
+		t.Errorf("comment lines want 3, got %d", res.CommentLines)
 	}
 }
 

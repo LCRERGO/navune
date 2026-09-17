@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/lcr/navune/internal/lang"
 )
@@ -54,11 +55,11 @@ func (*Parser) Parse(path string, src []byte) (*lang.FileResult, error) {
 	tf := fset.File(file.Pos())
 	res.Package = file.Name.Name
 
-	collectDecls(file, res, fset)
+	codeLines := scanCodeLines(tf, src)
+	res.PhysicalSLOC = len(codeLines)
+	res.CommentLines = countCommentLines(file.Comments, fset)
 
-	// Physical SLOC: distinct lines that carry at least one code token.
-	// We rescan without comments so pure-comment lines contribute nothing.
-	res.PhysicalSLOC = scanPhysicalSLOC(tf, src)
+	collectDecls(file, res, fset, codeLines)
 
 	// Token stream (comments/whitespace stripped, literals normalized).
 	res.Tokens = tokenize(tf, src)
@@ -77,17 +78,20 @@ func countLines(src []byte) int {
 	return n
 }
 
-func collectDecls(file *ast.File, res *lang.FileResult, fset *token.FileSet) {
+func collectDecls(file *ast.File, res *lang.FileResult, fset *token.FileSet, codeLines map[int]bool) {
 	for _, decl := range file.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
-			f := goFunc(d, fset)
+			f := goFunc(d, fset, codeLines)
 			if d.Recv != nil && len(d.Recv.List) > 0 {
 				if t, ok := recvType(d.Recv.List[0].Type); ok {
 					f.Enclosing = t
 				}
 			}
 			res.Functions = append(res.Functions, f)
+			if d.Body != nil {
+				res.Functions = append(res.Functions, collectAnonFuncs(d.Body, f.Name, fset, codeLines)...)
+			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
 				if ts, ok := spec.(*ast.TypeSpec); ok {
@@ -126,17 +130,76 @@ func recvType(expr ast.Expr) (string, bool) {
 	return "", false
 }
 
-func goFunc(d *ast.FuncDecl, fset *token.FileSet) lang.Function {
+func goFunc(d *ast.FuncDecl, fset *token.FileSet, codeLines map[int]bool) lang.Function {
 	f := lang.Function{
 		Name:       d.Name.Name,
 		Complexity: 1,
 		StartLine:  fset.Position(d.Pos()).Line,
 		EndLine:    fset.Position(d.End()).Line,
+		Params:     countParams(d.Type.Params),
 	}
 	if d.Body != nil {
 		f.Complexity += bodyComplexity(d.Body)
+		f.Cognitive, f.Nesting, f.BoolMax, f.Calls = bodyCognitive(d.Body, d.Name.Name)
 	}
+	f.Length = countCodeLinesIn(codeLines, f.StartLine, f.EndLine)
 	return f
+}
+
+// collectAnonFuncs emits every func literal under root as a first-class
+// function (ADR 0015). Nested literals are emitted too.
+func collectAnonFuncs(root ast.Node, enclosing string, fset *token.FileSet, codeLines map[int]bool) []lang.Function {
+	var out []lang.Function
+	ast.Inspect(root, func(n ast.Node) bool {
+		fl, ok := n.(*ast.FuncLit)
+		if !ok {
+			return true
+		}
+		start := fset.Position(fl.Pos()).Line
+		end := fset.Position(fl.End()).Line
+		f := lang.Function{
+			Name:       fmt.Sprintf("<anonymous@%d>", start),
+			Enclosing:  enclosing,
+			Anonymous:  true,
+			Complexity: 1,
+			StartLine:  start,
+			EndLine:    end,
+			Params:     countParams(fl.Type.Params),
+		}
+		if fl.Body != nil {
+			f.Complexity += bodyComplexity(fl.Body)
+			f.Cognitive, f.Nesting, f.BoolMax, f.Calls = bodyCognitive(fl.Body, "")
+		}
+		f.Length = countCodeLinesIn(codeLines, start, end)
+		out = append(out, f)
+		return true
+	})
+	return out
+}
+
+func countParams(fl *ast.FieldList) int {
+	if fl == nil {
+		return 0
+	}
+	n := 0
+	for _, f := range fl.List {
+		if len(f.Names) == 0 {
+			n++
+		} else {
+			n += len(f.Names)
+		}
+	}
+	return n
+}
+
+func countCodeLinesIn(lines map[int]bool, start, end int) int {
+	n := 0
+	for l := start; l <= end; l++ {
+		if lines[l] {
+			n++
+		}
+	}
+	return n
 }
 
 // bodyComplexity returns the cyclomatic contribution of a function body beyond
@@ -183,9 +246,183 @@ func countStatements(f *ast.File) int {
 	return n
 }
 
-// scanPhysicalSLOC counts the number of distinct source lines that contain at
-// least one non-comment token.
-func scanPhysicalSLOC(tf *token.File, src []byte) int {
+// cog accumulates cognitive complexity and nesting while walking statements.
+type cog struct {
+	nesting int
+	maxNest int
+	score   int
+}
+
+func (c *cog) enter() {
+	c.nesting++
+	if c.nesting > c.maxNest {
+		c.maxNest = c.nesting
+	}
+}
+
+func (c *cog) exit() { c.nesting-- }
+
+func (c *cog) block(b *ast.BlockStmt) {
+	if b == nil {
+		return
+	}
+	for _, s := range b.List {
+		c.stmt(s)
+	}
+}
+
+// bodyCognitive computes the SonarSource cognitive complexity of a function
+// body (ADR 0015), its maximum control-structure nesting, and its direct
+// callees. Nested func literals are separate function units and are skipped.
+func bodyCognitive(body *ast.BlockStmt, self string) (score, maxNesting, boolMax int, calls []string) {
+	c := &cog{}
+	c.block(body)
+	calls, recursion, logical, bm := scanCallsAndLogical(body, self)
+	c.score += logical + recursion
+	return c.score, c.maxNest, bm, calls
+}
+
+func (c *cog) stmt(s ast.Stmt) {
+	switch n := s.(type) {
+	case *ast.IfStmt:
+		c.score += 1 + c.nesting
+		c.enter()
+		c.block(n.Body)
+		c.exit()
+		c.elsePart(n.Else)
+	case *ast.ForStmt:
+		c.score += 1 + c.nesting
+		c.enter()
+		c.block(n.Body)
+		c.exit()
+	case *ast.RangeStmt:
+		c.score += 1 + c.nesting
+		c.enter()
+		c.block(n.Body)
+		c.exit()
+	case *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt:
+		c.score += 1 + c.nesting
+		c.enter()
+		switch x := n.(type) {
+		case *ast.SwitchStmt:
+			c.block(x.Body)
+		case *ast.TypeSwitchStmt:
+			c.block(x.Body)
+		case *ast.SelectStmt:
+			c.block(x.Body)
+		}
+		c.exit()
+	case *ast.BlockStmt:
+		c.block(n)
+	case *ast.LabeledStmt:
+		c.stmt(n.Stmt)
+	case *ast.CaseClause:
+		for _, s := range n.Body {
+			c.stmt(s)
+		}
+	case *ast.CommClause:
+		for _, s := range n.Body {
+			c.stmt(s)
+		}
+	case *ast.BranchStmt:
+		if (n.Tok == token.BREAK || n.Tok == token.CONTINUE) && n.Label != nil {
+			c.score++
+		}
+	}
+}
+
+// elsePart handles an if's else branch: an else-if chain adds increments with
+// no nesting penalty, and a plain else adds one increment.
+func (c *cog) elsePart(s ast.Stmt) {
+	switch e := s.(type) {
+	case nil:
+		return
+	case *ast.IfStmt:
+		c.score++
+		c.enter()
+		c.block(e.Body)
+		c.exit()
+		c.elsePart(e.Else)
+	case *ast.BlockStmt:
+		c.score++
+		c.enter()
+		c.block(e)
+		c.exit()
+	default:
+		c.stmt(s)
+	}
+}
+
+// scanCallsAndLogical counts direct callees, direct self-calls (recursion),
+// and sequences of like logical operators (SonarSource model).
+func scanCallsAndLogical(body *ast.BlockStmt, self string) (calls []string, recursion, logical, boolMax int) {
+	var stack []token.Token
+	ast.Inspect(body, func(n ast.Node) bool {
+		if n == nil {
+			stack = stack[:len(stack)-1]
+			return true
+		}
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+		inherited := token.ILLEGAL
+		if len(stack) > 0 {
+			inherited = stack[len(stack)-1]
+		}
+		switch x := n.(type) {
+		case *ast.BinaryExpr:
+			if x.Op == token.LAND || x.Op == token.LOR {
+				if x.Op != inherited {
+					logical++
+					if c := logicalOperands(x); c > boolMax {
+						boolMax = c
+					}
+				}
+				stack = append(stack, x.Op)
+				return true
+			}
+			stack = append(stack, token.ILLEGAL)
+		case *ast.CallExpr:
+			if name := calleeName(x.Fun); name != "" {
+				calls = append(calls, name)
+				if self != "" && name == self {
+					recursion++
+				}
+			}
+			stack = append(stack, token.ILLEGAL)
+		default:
+			stack = append(stack, token.ILLEGAL)
+		}
+		return true
+	})
+	return calls, recursion, logical, boolMax
+}
+
+// logicalOperands counts the leaf conditions in a logical expression tree.
+func logicalOperands(e ast.Expr) int {
+	if be, ok := e.(*ast.BinaryExpr); ok && (be.Op == token.LAND || be.Op == token.LOR) {
+		return logicalOperands(be.X) + logicalOperands(be.Y)
+	}
+	return 1
+}
+
+func calleeName(e ast.Expr) string {
+	switch x := e.(type) {
+	case *ast.Ident:
+		return x.Name
+	case *ast.SelectorExpr:
+		return x.Sel.Name
+	case *ast.IndexExpr:
+		return calleeName(x.X)
+	case *ast.IndexListExpr:
+		return calleeName(x.X)
+	}
+	return ""
+}
+
+// scanCodeLines returns the set of lines that contain at least one non-comment
+// token.
+func scanCodeLines(tf *token.File, src []byte) map[int]bool {
 	var s scanner.Scanner
 	s.Init(tf, src, nil, scanner.ScanComments)
 	lines := map[int]bool{}
@@ -197,10 +434,37 @@ func scanPhysicalSLOC(tf *token.File, src []byte) int {
 		if tok == token.COMMENT {
 			continue
 		}
-		p := tf.Position(pos)
-		lines[p.Line] = true
+		lines[tf.Position(pos).Line] = true
 	}
-	return len(lines)
+	return lines
+}
+
+// countCommentLines counts significant comment lines: lines whose comment text
+// contains at least one letter or digit. Empty and decorative comment lines are
+// excluded; commented-out code counts (ADR 0015).
+func countCommentLines(groups []*ast.CommentGroup, fset *token.FileSet) int {
+	seen := map[int]bool{}
+	for _, cg := range groups {
+		for _, c := range cg.List {
+			start := fset.Position(c.Slash).Line
+			lines := strings.Split(c.Text, "\n")
+			for i, line := range lines {
+				if isSignificantComment(line) {
+					seen[start+i] = true
+				}
+			}
+		}
+	}
+	return len(seen)
+}
+
+func isSignificantComment(text string) bool {
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
 }
 
 // tokenize produces Navune's normalized token stream for the duplication

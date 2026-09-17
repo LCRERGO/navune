@@ -2,15 +2,43 @@
 // produces (ADR 0006: file is the unit of analysis) and the parser interface.
 package lang
 
-// Lang identifies an analyzed language.
+import "strings"
+
+// Lang identifies an analyzed language. Values are the canonical keys used in
+// config and report output (ADR 0016).
 type Lang string
 
 const (
 	Go         Lang = "go"
-	TypeScript Lang = "ts"
-	JavaScript Lang = "js"
-	Python     Lang = "py"
+	TypeScript Lang = "typescript"
+	JavaScript Lang = "javascript"
+	Python     Lang = "python"
+	C          Lang = "c"
+	CPP        Lang = "cpp"
 )
+
+// Canonical resolves a config/output language key to a Lang, accepting the
+// short aliases ts/js/py (ADR 0016).
+func Canonical(name string) (Lang, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "go":
+		return Go, true
+	case "typescript", "ts":
+		return TypeScript, true
+	case "javascript", "js":
+		return JavaScript, true
+	case "python", "py":
+		return Python, true
+	case "c":
+		return C, true
+	case "cpp", "c++", "cxx":
+		return CPP, true
+	}
+	return "", false
+}
+
+// Languages lists every supported language in canonical order.
+func Languages() []Lang { return []Lang{Go, TypeScript, JavaScript, Python, C, CPP} }
 
 // Class is how a file is treated for metrics and gates (ADR 0011).
 type Class int
@@ -57,6 +85,13 @@ type Function struct {
 	StartLine  int
 	EndLine    int
 	Complexity int // cyclomatic complexity (>= 1)
+	Cognitive  int // cognitive complexity (SonarSource model, >= 0)
+	Length     int // non-comment physical lines
+	Nesting    int // max control-structure nesting depth
+	Params     int // declared parameters (receiver/self excluded)
+	BoolMax    int // most conditions in a single boolean expression
+	Calls      []string
+	Anonymous  bool // lambda/closure/arrow function
 }
 
 // TypeDecl is a named type at the type layer. Abstract = interface in Go.
@@ -75,6 +110,7 @@ type FileResult struct {
 
 	TotalLines   int // physical lines including blanks & comments
 	PhysicalSLOC int // lines containing at least one code token
+	CommentLines int // significant comment lines
 	LogicalLOC   int // statement/declaration count
 
 	Functions []Function

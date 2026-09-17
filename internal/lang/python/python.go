@@ -6,6 +6,7 @@ package python
 import (
 	"fmt"
 	"strings"
+	"unicode"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	tspy "github.com/tree-sitter/tree-sitter-python/bindings/go"
@@ -122,19 +123,33 @@ func isLogicalNode(kind string) bool {
 }
 
 type walker struct {
-	res     *lang.FileResult
-	src     []byte
-	lines   map[int]bool
-	logical int
-	funcs   []*lang.Function
+	res      *lang.FileResult
+	src      []byte
+	lines    map[int]bool
+	comments map[int]bool
+	logical  int
+	funcs    []*lang.Function
 }
 
 func (w *walker) walk(root *sitter.Node) {
 	w.lines = map[int]bool{}
+	w.comments = map[int]bool{}
 	w.walkNode(root, nil, "", false)
 	for _, f := range w.funcs {
+		f.Length = w.codeLinesBetween(f.StartLine, f.EndLine)
 		w.res.Functions = append(w.res.Functions, *f)
 	}
+	w.res.CommentLines = len(w.comments)
+}
+
+func (w *walker) codeLinesBetween(start, end int) int {
+	n := 0
+	for l := start; l <= end; l++ {
+		if w.lines[l] {
+			n++
+		}
+	}
+	return n
 }
 
 // walkNode traverses n. fn is the function currently being attributed
@@ -144,6 +159,7 @@ func (w *walker) walk(root *sitter.Node) {
 func (w *walker) walkNode(n *sitter.Node, fn *lang.Function, typeName string, inFunc bool) {
 	kind := n.Kind()
 	if commentKinds[kind] {
+		w.recordComment(n)
 		return
 	}
 	if stringNodes[kind] {
@@ -163,25 +179,12 @@ func (w *walker) walkNode(n *sitter.Node, fn *lang.Function, typeName string, in
 		return
 	}
 	if funcKinds[kind] {
-		name := w.nameOf(n)
-		enclosing := ""
-		if typeName != "" && !inFunc {
-			enclosing = typeName
-		}
-		f := &lang.Function{
-			Name:       name,
-			Enclosing:  enclosing,
-			Complexity: 1,
-			StartLine:  int(n.StartPosition().Row) + 1,
-			EndLine:    int(n.EndPosition().Row) + 1,
-		}
-		w.funcs = append(w.funcs, f)
-		w.children(n, f, typeName, true)
+		w.addFunction(n, fn, typeName, inFunc, false)
 		return
 	}
-	// lambda is an anonymous closure: no unit, decisions not attributed up
+	// lambda is an anonymous function unit (ADR 0015)
 	if kind == "lambda" {
-		w.children(n, nil, typeName, true)
+		w.addFunction(n, fn, typeName, inFunc, true)
 		return
 	}
 
@@ -203,6 +206,275 @@ func (w *walker) walkNode(n *sitter.Node, fn *lang.Function, typeName string, in
 	w.children(n, fn, typeName, inFunc)
 }
 
+// addFunction emits a named function or lambda as a first-class unit and
+// computes its extended measures (ADR 0015).
+func (w *walker) addFunction(n *sitter.Node, fn *lang.Function, typeName string, inFunc, isLambda bool) {
+	start := int(n.StartPosition().Row) + 1
+	name := w.nameOf(n)
+	enclosing := ""
+	if isLambda {
+		name = fmt.Sprintf("<anonymous@%d>", start)
+		if fn != nil {
+			enclosing = fn.Name
+		} else {
+			enclosing = typeName
+		}
+	} else if typeName != "" && !inFunc {
+		enclosing = typeName
+	}
+	f := &lang.Function{
+		Name:       name,
+		Enclosing:  enclosing,
+		Anonymous:  isLambda,
+		Complexity: 1,
+		StartLine:  start,
+		EndLine:    int(n.EndPosition().Row) + 1,
+		Params:     w.paramsOf(n, !isLambda && enclosing != ""),
+	}
+	self := ""
+	if !isLambda {
+		self = name
+	}
+	f.Cognitive, f.Nesting, f.BoolMax, f.Calls = w.analyzeBody(n, self)
+	w.funcs = append(w.funcs, f)
+	w.children(n, f, typeName, true)
+}
+
+func (w *walker) paramsOf(n *sitter.Node, isMethod bool) int {
+	p := n.ChildByFieldName("parameters")
+	if p == nil {
+		return 0
+	}
+	cnt := 0
+	first := ""
+	for i := uint(0); i < p.NamedChildCount(); i++ {
+		ch := p.NamedChild(i)
+		if ch.Kind() == "comment" {
+			continue
+		}
+		if first == "" {
+			first = w.paramName(ch)
+		}
+		cnt++
+	}
+	if isMethod && (first == "self" || first == "cls") && cnt > 0 {
+		cnt--
+	}
+	return cnt
+}
+
+func (w *walker) paramName(ch *sitter.Node) string {
+	if ch.Kind() == "identifier" {
+		return w.text(ch)
+	}
+	for i := uint(0); i < ch.NamedChildCount(); i++ {
+		if ch.NamedChild(i).Kind() == "identifier" {
+			return w.text(ch.NamedChild(i))
+		}
+	}
+	return ""
+}
+
+// analyzeBody computes cognitive complexity, maximum control-structure nesting,
+// and direct callees for a function or lambda node (ADR 0015).
+func (w *walker) analyzeBody(n *sitter.Node, self string) (cognitive, nesting, boolMax int, calls []string) {
+	body := n.ChildByFieldName("body")
+	if body == nil {
+		return 0, 0, 0, nil
+	}
+	c := &cogWalk{w: w, self: self}
+	c.node(body, "")
+	c.cognitive += c.logical + c.recursion
+	return c.cognitive, c.maxDepth, c.boolMax, c.calls
+}
+
+type cogWalk struct {
+	w         *walker
+	cognitive int
+	depth     int
+	maxDepth  int
+	boolMax   int
+	self      string
+	calls     []string
+	recursion int
+	logical   int
+}
+
+func (c *cogWalk) nest(n *sitter.Node) {
+	if n == nil {
+		return
+	}
+	c.depth++
+	if c.depth > c.maxDepth {
+		c.maxDepth = c.depth
+	}
+	c.node(n, "")
+	c.depth--
+}
+
+func sameNode(a, b *sitter.Node) bool {
+	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
+}
+
+func (c *cogWalk) walkChildren(n *sitter.Node, inh string) {
+	for i := uint(0); i < n.NamedChildCount(); i++ {
+		c.node(n.NamedChild(i), inh)
+	}
+}
+
+func (c *cogWalk) walkOthers(n, body *sitter.Node) {
+	for i := uint(0); i < n.NamedChildCount(); i++ {
+		ch := n.NamedChild(i)
+		if sameNode(ch, body) {
+			continue
+		}
+		c.node(ch, "")
+	}
+}
+
+func (c *cogWalk) node(n *sitter.Node, inh string) {
+	if n == nil {
+		return
+	}
+	kind := n.Kind()
+	if funcKinds[kind] || kind == "lambda" {
+		return // separate function unit
+	}
+	switch kind {
+	case "if_statement":
+		c.cognitive += 1 + c.depth
+		c.nest(n.ChildByFieldName("consequence"))
+		c.node(n.ChildByFieldName("condition"), "")
+		c.alternative(n.ChildByFieldName("alternative"))
+		return
+	case "for_statement", "while_statement", "except_clause", "match_statement":
+		c.cognitive += 1 + c.depth
+		body := n.ChildByFieldName("body")
+		c.nest(body)
+		c.walkOthers(n, body)
+		return
+	case "conditional_expression":
+		c.cognitive += 1 + c.depth
+		for i := uint(0); i < n.NamedChildCount(); i++ {
+			c.nest(n.NamedChild(i))
+		}
+		return
+	case "boolean_operator":
+		op := c.w.operatorText(n)
+		if op == "and" || op == "or" {
+			if op != inh {
+				c.logical++
+				if cnt := c.boolOperands(n); cnt > c.boolMax {
+					c.boolMax = cnt
+				}
+			}
+			inh = op
+		} else {
+			inh = ""
+		}
+		c.walkChildren(n, inh)
+		return
+	case "call":
+		if name := c.w.calleeName(n); name != "" {
+			c.calls = append(c.calls, name)
+			if c.self != "" && name == c.self {
+				c.recursion++
+			}
+		}
+		c.walkChildren(n, "")
+		return
+	}
+	c.walkChildren(n, inh)
+}
+
+func (c *cogWalk) alternative(alt *sitter.Node) {
+	if alt == nil {
+		return
+	}
+	switch alt.Kind() {
+	case "elif_clause":
+		c.cognitive++ // else-if: no nesting penalty
+		c.nest(alt.ChildByFieldName("consequence"))
+		c.node(alt.ChildByFieldName("condition"), "")
+		c.alternative(alt.ChildByFieldName("alternative"))
+	case "else_clause":
+		c.cognitive++
+		c.nest(alt.ChildByFieldName("body"))
+	default:
+		c.nest(alt)
+	}
+}
+
+func (w *walker) operatorText(n *sitter.Node) string {
+	if op := n.ChildByFieldName("operator"); op != nil {
+		return w.text(op)
+	}
+	for i := uint(0); i < n.ChildCount(); i++ {
+		ch := n.Child(i)
+		if !ch.IsNamed() && ch.ChildCount() == 0 {
+			if ch.Kind() == "and" || ch.Kind() == "or" {
+				return ch.Kind()
+			}
+		}
+	}
+	return ""
+}
+
+func (w *walker) calleeName(n *sitter.Node) string {
+	fn := n.ChildByFieldName("function")
+	if fn == nil {
+		return ""
+	}
+	switch fn.Kind() {
+	case "identifier":
+		return w.text(fn)
+	case "attribute":
+		if attr := fn.ChildByFieldName("attribute"); attr != nil {
+			return w.text(attr)
+		}
+	}
+	return ""
+}
+
+// boolOperands counts the leaf conditions in a logical expression tree.
+func (c *cogWalk) boolOperands(n *sitter.Node) int {
+	if n == nil || n.Kind() != "boolean_operator" {
+		return 1
+	}
+	op := c.w.operatorText(n)
+	if op != "and" && op != "or" {
+		return 1
+	}
+	left := n.ChildByFieldName("left")
+	right := n.ChildByFieldName("right")
+	if left == nil && n.NamedChildCount() > 0 {
+		left = n.NamedChild(0)
+	}
+	if right == nil && n.NamedChildCount() > 1 {
+		right = n.NamedChild(1)
+	}
+	return c.boolOperands(left) + c.boolOperands(right)
+}
+
+// recordComment counts significant comment lines (ADR 0015).
+func (w *walker) recordComment(n *sitter.Node) {
+	start := int(n.StartPosition().Row) + 1
+	for i, line := range strings.Split(w.text(n), "\n") {
+		if isSignificantComment(line) {
+			w.comments[start+i] = true
+		}
+	}
+}
+
+func isSignificantComment(text string) bool {
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
 func (w *walker) children(n *sitter.Node, fn *lang.Function, typeName string, inFunc bool) {
 	for i := uint(0); i < n.ChildCount(); i++ {
 		c := n.Child(i)
@@ -216,7 +488,11 @@ func (w *walker) children(n *sitter.Node, fn *lang.Function, typeName string, in
 
 func (w *walker) emitLeaf(n *sitter.Node) {
 	kind := n.Kind()
-	if commentKinds[kind] || stringNodes[kind] {
+	if commentKinds[kind] {
+		w.recordComment(n)
+		return
+	}
+	if stringNodes[kind] {
 		return
 	}
 	line := int(n.StartPosition().Row) + 1
