@@ -39,6 +39,29 @@ func TestVersion(t *testing.T) {
 	if !strings.Contains(out, "navune") {
 		t.Errorf("version output missing name: %q", out)
 	}
+	// -V is the short alias for version (ADR 0016; -v is --verbose on analyze)
+	codeV, outV := runCLI(t, ".", "-V")
+	if codeV != gate.ExitPass || !strings.Contains(outV, "languages:") {
+		t.Errorf("-V should print version, got code=%d out=%q", codeV, outV)
+	}
+}
+
+func TestVerboseAddsFunctionDetail(t *testing.T) {
+	dir := t.TempDir()
+	src := "package main\n\nfunc f(x int) int {\n\tif x > 0 {\n\t\treturn 1\n\t}\n\treturn 0\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out := runCLI(t, dir, "analyze", ".", "--format", "json", "--verbose")
+	if code != gate.ExitPass {
+		t.Fatalf("analyze exit want 0, got %d\n%s", code, out)
+	}
+	if !strings.Contains(out, "functions_detail") {
+		t.Errorf("verbose JSON should include functions_detail: %s", out)
+	}
+	if !strings.Contains(out, "\"issues\"") {
+		t.Errorf("JSON should include an issues array: %s", out)
+	}
 }
 
 func TestInitWritesConfig(t *testing.T) {

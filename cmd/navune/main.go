@@ -72,12 +72,15 @@ FLAGS
   --config FILE   navune.yaml to use; overrides upward discovery from <path>
   --format FMT    report format: text (default), json, or mermaid
   --out FILE      write the report to FILE instead of stdout
+  --verbose, -v   add per-function detail (JSON functions array; text lists
+                  functions that carry a smell)
 
 DESCRIPTION
-  Analyzes the codebase at <path>, measures size, cyclomatic complexity,
-  duplication, dependency cycles and coupling, evaluates budgets, and prints
-  a report. Exit code 1 signals an error-tier budget breach; exit code 3
-  signals an internal error (see "navune help" for all exit codes).
+  Analyzes the codebase at <path>, measures size, cyclomatic and cognitive
+  complexity, comments, function shape, duplication, dependency cycles and
+  coupling, reports structural smells, evaluates budgets, and prints a report.
+  Exit code 1 signals an error-tier budget breach; exit code 3 signals an
+  internal error (see "navune help" for all exit codes).
 
 EXAMPLES
   navune analyze .
@@ -125,7 +128,7 @@ func run(args []string) int {
 		return runAnalyze(args[1:])
 	case "init":
 		return runInit(args[1:])
-	case "version", "--version", "-v":
+	case "version", "--version", "-V":
 		return runVersion()
 	case "help", "--help", "-h":
 		return runHelp(args[1:])
@@ -151,10 +154,11 @@ func runHelp(args []string) int {
 }
 
 type analyzeOpts struct {
-	path   string
-	config string
-	format report.Format
-	out    string
+	path    string
+	config  string
+	format  report.Format
+	out     string
+	verbose bool
 }
 
 func parseAnalyze(args []string) (*analyzeOpts, int, error) {
@@ -195,6 +199,8 @@ func parseAnalyze(args []string) (*analyzeOpts, int, error) {
 		case "-h", "--help":
 			fmt.Print(helpFor("analyze"))
 			return nil, gate.ExitPass, errHelp
+		case "--verbose", "-v":
+			opts.verbose = true
 		default:
 			if opts.path != "" {
 				return nil, gate.ExitUsage, fmt.Errorf("unexpected argument %q", a)
@@ -235,7 +241,7 @@ func runAnalyze(args []string) int {
 		return gate.ExitUsage
 	}
 
-	rpt, err := analysis.Analyze(opts.path, cfg)
+	rpt, err := analysis.AnalyzeOptions(opts.path, cfg, analysis.Options{Verbose: opts.verbose})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "navune: %v\n", err)
 		return gate.ExitInternal
@@ -295,6 +301,6 @@ func runInit(args []string) int {
 func runVersion() int {
 	fmt.Printf("navune %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 	fmt.Printf("commit %s built %s by %s\n", commit, date, builtBy)
-	fmt.Println("languages: go, typescript, javascript, python")
+	fmt.Println("languages: go, typescript, javascript, python, c, cpp")
 	return gate.ExitPass
 }

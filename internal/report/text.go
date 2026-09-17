@@ -29,16 +29,25 @@ func renderText(r *analysis.Report) string {
 	if s.Functions > 0 {
 		fmt.Fprintf(&b, "Complexity:  avg %.2f / function · worst %d (%s)\n",
 			s.AvgComplexity, s.WorstComplexity, s.WorstFunction)
+		fmt.Fprintf(&b, "Cognitive:   avg %.2f / function · worst %d\n",
+			s.AvgCognitive, s.WorstCognitive)
+		fmt.Fprintf(&b, "Shape:       longest %d lines · max nesting %d · max params %d\n",
+			s.MaxFunctionLength, s.MaxNesting, s.MaxParams)
 	} else {
 		b.WriteString("Complexity: no functions\n")
 	}
-	fmt.Fprintf(&b, "Duplication: %d / %d tokens (%.2f%%) · %d blocks\n",
-		s.DupTokens, s.TotalTokens, s.DupPct, s.DupBlocks)
+	fmt.Fprintf(&b, "Comments:    %d lines (%.2f%%)\n", s.CommentLines, s.CommentPct)
+	fmt.Fprintf(&b, "Duplication: %d / %d tokens (%.2f%%) · %d blocks · %d lines\n",
+		s.DupTokens, s.TotalTokens, s.DupPct, s.DupBlocks, s.DuplicatedLines)
 	fmt.Fprintf(&b, "Cycles:      %d component(s) · %d/%d files in cycle (%.2f%%) · largest %d\n",
 		s.Cycles, s.FilesInCycle, s.ProdFiles, s.InCyclePct, s.MaxCycleMembers)
 
 	writeCycles(&b, r)
 	writeFileTable(&b, r)
+	writeIssues(&b, r)
+	if r.Verbose {
+		writeVerboseFunctions(&b, r)
+	}
 
 	b.WriteString("\nQuality gate (budgets):\n")
 	if len(r.Budgets) == 0 {
@@ -54,12 +63,58 @@ func renderText(r *analysis.Report) string {
 		if ok {
 			prec = m.Precision
 		}
+		key := br.Key
+		if br.Language != "" {
+			key = br.Language + "/" + br.Key
+		}
 		fmt.Fprintf(&b, "  [%s] %-26s %12s / %-10s  %s\n",
-			padTier(br.Tier), br.Key, formatNum(br.Value, prec), formatNum(br.Limit, prec), status)
+			padTier(br.Tier), key, formatNum(br.Value, prec), formatNum(br.Limit, prec), status)
 	}
 	fmt.Fprintf(&b, "\nComposite index: %.1f / 100\n", r.Composite)
 	fmt.Fprintf(&b, "Exit code: %d (%s)\n", r.ExitCode, exitWord(r.ExitCode))
 	return b.String()
+}
+
+// writeIssues prints the structural smell findings (ADR 0016).
+func writeIssues(b *strings.Builder, r *analysis.Report) {
+	if len(r.Issues) == 0 {
+		return
+	}
+	b.WriteString(fmt.Sprintf("\nStructural smells (%d):\n", len(r.Issues)))
+	fmt.Fprintf(b, "  %-9s %-22s %-40s %s\n", "severity", "rule", "location", "value/threshold")
+	for _, iss := range r.Issues {
+		loc := fmt.Sprintf("%s:%d", iss.File, iss.Line)
+		if iss.Function != "" {
+			loc += " " + iss.Function
+		}
+		fmt.Fprintf(b, "  %-9s %-22s %-40s %.2f / %.2f\n",
+			iss.Severity, iss.Rule, loc, iss.Value, iss.Threshold)
+	}
+}
+
+// writeVerboseFunctions prints only functions that carry at least one smell,
+// keeping terminal output readable (ADR 0016).
+func writeVerboseFunctions(b *strings.Builder, r *analysis.Report) {
+	flagged := map[string]bool{}
+	for _, iss := range r.Issues {
+		if iss.Function != "" {
+			flagged[iss.File+"\x00"+iss.Function] = true
+		}
+	}
+	if len(flagged) == 0 {
+		return
+	}
+	b.WriteString("\nFlagged functions:\n")
+	fmt.Fprintf(b, "  %-40s %6s %6s %6s %6s\n", "function", "cyclo", "cogn", "lines", "nest")
+	for _, f := range r.Files {
+		for _, fn := range f.FunctionsDetail {
+			if !flagged[f.Path+"\x00"+fn.Name] {
+				continue
+			}
+			fmt.Fprintf(b, "  %-40s %6d %6d %6d %6d\n",
+				f.Path+": "+fn.Name, fn.Complexity, fn.Cognitive, fn.Length, fn.Nesting)
+		}
+	}
 }
 
 // writeCycles prints each cyclic component.
