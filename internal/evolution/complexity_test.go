@@ -63,6 +63,8 @@ func TestComplexityRises(t *testing.T) {
 		{"go", complexityStepsGo()},
 		{"ts", complexityStepsTS()},
 		{"py", complexityStepsPy()},
+		{"c", complexityStepsC()},
+		{"cpp", complexityStepsCPP()},
 	}
 	for _, c := range cases {
 		c := c

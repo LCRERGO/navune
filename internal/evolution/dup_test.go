@@ -76,6 +76,8 @@ func TestDuplicationAppears(t *testing.T) {
 		{"go", dupStepsGo()},
 		{"ts", dupStepsTS()},
 		{"py", dupStepsPy()},
+		{"c", dupStepsC()},
+		{"cpp", dupStepsCPP()},
 	}
 	for _, c := range cases {
 		c := c

@@ -63,6 +63,8 @@ func TestCycleAppears(t *testing.T) {
 		{"go", cycleStepsGo()},
 		{"ts", cycleStepsTS()},
 		{"py", cycleStepsPy()},
+		{"c", cycleStepsC()},
+		{"cpp", cycleStepsCPP()},
 	}
 	for _, c := range cases {
 		c := c
