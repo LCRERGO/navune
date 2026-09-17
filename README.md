@@ -16,6 +16,7 @@ tree-sitter adapter and land on the roadmap.
 - [Features](#features)
 - [Language support](#language-support)
 - [Output formats](#output-formats)
+- [Shell completion and man page](#shell-completion-and-man-page)
 - [Configuration](#configuration-navuneyaml)
 - [The composite index](#the-composite-index-transparent-by-design)
 - [What counts as "the codebase"](#what-counts-as-the-codebase)
@@ -157,6 +158,26 @@ flowchart LR
   f_pkg_beta_b_py --> f_pkg_gamma_c_py
   f_pkg_gamma_c_py --> f_pkg_alpha_a_py
 ```
+
+## Shell completion and man page
+
+Navune ships a bash completion (`completions/navune.bash`) and a man page
+(`man/navune.1`). They are committed static files — no new subcommands and no
+generation step ([ADR 0018](docs/adr/0018-packaged-completion-and-manpage.md)).
+
+```sh
+# Install under PREFIX (default /usr/local); honors DESTDIR for staging.
+make install-completions   # .../share/bash-completion/completions/navune
+make install-man           # .../share/man/man1/navune.1
+
+# Or source the completion directly from a checkout.
+source completions/navune.bash
+
+# Read the man page without installing it.
+man ./man/navune.1
+```
+
+Release archives include both files under `completions/` and `man/`.
 
 ## Configuration (`navune.yaml`)
 

@@ -36,6 +36,11 @@ make build      # writes bin/navune
 make test       # default suite (unit + golden fixtures + self-analysis)
 make vet        # go vet ./...
 make evolve     # opt-in fixture-evolution suite (-tags evolution)
+
+# Install the packaged bash completion / man page under PREFIX (default
+# /usr/local); DESTDIR is honored for staging. See ADR 0018.
+make install-completions
+make install-man
 ```
 
 cgo is mandatory (tree-sitter grammars); do not try `CGO_ENABLED=0`.
@@ -55,7 +60,9 @@ To cut a release:
    (`v0.2.0-rc1`) are published as GitHub pre-releases.
 3. CI runs gofmt/vet/test, builds linux/amd64, linux/arm64, darwin/amd64,
    darwin/arm64, and windows/amd64 natively, then attaches
-   `navune_<version>_<os>_<arch>.tar.gz`/`.zip` and `checksums.txt`.
+   `navune_<version>_<os>_<arch>.tar.gz`/`.zip` and `checksums.txt`. Each
+   archive contains the binary, `LICENSE`, `README.md`, `completions/`, and
+   `man/` (ADR 0018).
 
 Run the release workflow manually (`workflow_dispatch`) for a dry-run: it builds
 and packages everything as a workflow artifact but creates no release.
@@ -104,6 +111,10 @@ kind names are grammar-specific and the file layout differs per grammar
   wording).
 - [`docs/adr/`](adr/) — the design record; read before changing metric
   semantics.
+
+The packaged `completions/navune.bash` and `man/navune.1` are hand-maintained
+(ADR 0018). When you change a command, flag, or `--format` value, update both
+and the help text; `cmd/navune/artifacts_test.go` fails until they agree.
 
 Keep the split clean: README sells and orients; usage/metrics reference;
 glossary and ADRs are the record. When you change a metric, update

@@ -98,3 +98,19 @@ navune analyze . --config ./navune.yaml
 # Show help.
 navune help analyze
 ```
+
+## Shell completion and man page
+
+A bash completion and a Unix man page ship with the source and in release
+archives (ADR 0018):
+
+```sh
+make install-completions   # .../share/bash-completion/completions/navune
+make install-man           # .../share/man/man1/navune.1
+
+source completions/navune.bash   # or source it from a checkout
+man ./man/navune.1               # or read it without installing
+```
+
+The man page covers the same commands, options, and exit status documented
+above.
