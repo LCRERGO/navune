@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/lcr/navune/internal/config"
+	"github.com/lcr/navune/internal/lang"
+	"github.com/lcr/navune/internal/smell"
 )
 
 func TestValidateUnknownMetric(t *testing.T) {
@@ -72,5 +74,47 @@ func TestCompositeFormula(t *testing.T) {
 	v3 := Evaluate(cfg, map[string]float64{"worst_complexity": 0})
 	if v3.Score != 100 {
 		t.Errorf("want composite 100 at zero, got %v", v3.Score)
+	}
+}
+
+func TestValidateSmellRule(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Smells = map[string]smell.RuleOverride{"not-a-rule": {}}
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected error for unknown smell rule")
+	}
+	cfg = config.Defaults()
+	cfg.LanguageSmells = map[string]map[string]smell.RuleOverride{
+		"klingon": {"file-length": {}},
+	}
+	if err := Validate(cfg); err == nil {
+		t.Fatal("expected error for unknown language")
+	}
+}
+
+func TestEvaluateLanguages(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.LanguageBudgets = map[string]map[string]config.Budget{
+		"python": {"avg_complexity": {Limit: 8, Tier: "error"}},
+	}
+	v := Evaluate(cfg, map[string]float64{})
+	v.EvaluateLanguages(cfg, map[lang.Lang]map[string]float64{
+		lang.Python: {"avg_complexity": 12}, // > 8, error tier
+	})
+	if v.ExitCode != ExitBreach {
+		t.Errorf("per-language error breach must fail: exit %d", v.ExitCode)
+	}
+	found := false
+	for _, b := range v.Budgets {
+		if b.Language == "python" && b.Key == "avg_complexity" && b.Breached {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected breached python/avg_complexity budget, got %+v", v.Budgets)
+	}
+	// composite must be unaffected by per-language budgets
+	if v.Score != 100 {
+		t.Errorf("composite should stay 100, got %v", v.Score)
 	}
 }
