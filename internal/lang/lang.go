@@ -15,6 +15,8 @@ const (
 	Python     Lang = "python"
 	C          Lang = "c"
 	CPP        Lang = "cpp"
+	Java       Lang = "java"
+	Rust       Lang = "rust"
 )
 
 // Canonical resolves a config/output language key to a Lang, accepting the
@@ -33,12 +35,16 @@ func Canonical(name string) (Lang, bool) {
 		return C, true
 	case "cpp", "c++", "cxx":
 		return CPP, true
+	case "java":
+		return Java, true
+	case "rust", "rs":
+		return Rust, true
 	}
 	return "", false
 }
 
 // Languages lists every supported language in canonical order.
-func Languages() []Lang { return []Lang{Go, TypeScript, JavaScript, Python, C, CPP} }
+func Languages() []Lang { return []Lang{Go, TypeScript, JavaScript, Python, C, CPP, Java, Rust} }
 
 // Class is how a file is treated for metrics and gates (ADR 0011).
 type Class int

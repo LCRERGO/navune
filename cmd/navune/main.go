@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	version = "dev"
+	version = "1.1.0"
 	commit  = "unknown"
 	date    = "unknown"
 	builtBy = "unknown"
@@ -301,6 +301,6 @@ func runInit(args []string) int {
 func runVersion() int {
 	fmt.Printf("navune %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 	fmt.Printf("commit %s built %s by %s\n", commit, date, builtBy)
-	fmt.Println("languages: go, typescript, javascript, python, c, cpp")
+	fmt.Println("languages: go, typescript, javascript, python, c, cpp, java, rust")
 	return gate.ExitPass
 }

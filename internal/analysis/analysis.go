@@ -21,7 +21,9 @@ import (
 	"github.com/lcr/navune/internal/lang"
 	"github.com/lcr/navune/internal/lang/cfamily"
 	"github.com/lcr/navune/internal/lang/golang"
+	"github.com/lcr/navune/internal/lang/java"
 	"github.com/lcr/navune/internal/lang/python"
+	"github.com/lcr/navune/internal/lang/rust"
 	"github.com/lcr/navune/internal/lang/treescript"
 	"github.com/lcr/navune/internal/smell"
 )
@@ -186,6 +188,10 @@ func parserFor(langID lang.Lang) lang.Parser {
 		return cfamily.NewC()
 	case lang.CPP:
 		return cfamily.NewCPP()
+	case lang.Java:
+		return java.New()
+	case lang.Rust:
+		return rust.New()
 	}
 	return nil
 }

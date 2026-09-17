@@ -35,23 +35,25 @@ type Results struct {
 
 // extLang maps a file extension to a language.
 var extLang = map[string]lang.Lang{
-	".go":  lang.Go,
-	".ts":  lang.TypeScript,
-	".tsx": lang.TypeScript,
-	".js":  lang.JavaScript,
-	".jsx": lang.JavaScript,
-	".mjs": lang.JavaScript,
-	".cjs": lang.JavaScript,
-	".py":  lang.Python,
-	".c":   lang.C,
-	".cc":  lang.CPP,
-	".cpp": lang.CPP,
-	".cxx": lang.CPP,
-	".c++": lang.CPP,
-	".hpp": lang.CPP,
-	".hh":  lang.CPP,
-	".hxx": lang.CPP,
-	".h":   lang.CPP, // ambiguous: the cfamily adapter sniffs C vs C++ (ADR 0017)
+	".go":   lang.Go,
+	".ts":   lang.TypeScript,
+	".tsx":  lang.TypeScript,
+	".js":   lang.JavaScript,
+	".jsx":  lang.JavaScript,
+	".mjs":  lang.JavaScript,
+	".cjs":  lang.JavaScript,
+	".py":   lang.Python,
+	".c":    lang.C,
+	".cc":   lang.CPP,
+	".cpp":  lang.CPP,
+	".cxx":  lang.CPP,
+	".c++":  lang.CPP,
+	".hpp":  lang.CPP,
+	".hh":   lang.CPP,
+	".hxx":  lang.CPP,
+	".h":    lang.CPP, // ambiguous: the cfamily adapter sniffs C vs C++ (ADR 0017)
+	".java": lang.Java,
+	".rs":   lang.Rust,
 }
 
 // Walk collects analyzable source files under root, honouring config
@@ -143,6 +145,13 @@ func IsTestFile(f File) bool {
 	case lang.C, lang.CPP:
 		b := filepath.Base(base)
 		return strings.HasPrefix(b, "test_") || strings.Contains(b, "_test.")
+	case lang.Java:
+		b := filepath.Base(base)
+		return strings.HasSuffix(b, "Test.java") || strings.HasSuffix(b, "Tests.java") ||
+			strings.HasSuffix(b, "TestCase.java") || strings.HasPrefix(b, "Test")
+	case lang.Rust:
+		b := filepath.Base(base)
+		return strings.HasPrefix(b, "test_") || strings.HasSuffix(b, "_test.rs")
 	}
 	return false
 }
