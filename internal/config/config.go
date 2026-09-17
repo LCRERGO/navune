@@ -11,6 +11,9 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/lcr/navune/internal/lang"
+	"github.com/lcr/navune/internal/smell"
 )
 
 const ConfigName = "navune.yaml"
@@ -28,6 +31,56 @@ type Config struct {
 	Exclude []string           `yaml:"exclude"`
 	Budgets map[string]Budget  `yaml:"budgets"`
 	Weights map[string]float64 `yaml:"weights"`
+
+	// Smells configure the structural smell layer (ADR 0016).
+	Smells map[string]smell.RuleOverride `yaml:"smells"`
+	// LanguageSmells override rule fields per language.
+	LanguageSmells map[string]map[string]smell.RuleOverride `yaml:"language_smells"`
+	// LanguageBudgets add per-language limits evaluated alongside the global
+	// budgets.
+	LanguageBudgets map[string]map[string]Budget `yaml:"language_budgets"`
+	// IncludePaths are C/C++ #include search directories, relative to this
+	// config file (ADR 0017).
+	IncludePaths []string `yaml:"include_paths"`
+
+	dir string // directory of the loaded config file, for relative resolution
+}
+
+// IncludeDirs returns the include search directories as absolute paths.
+func (c *Config) IncludeDirs() []string {
+	out := make([]string, 0, len(c.IncludePaths))
+	for _, p := range c.IncludePaths {
+		if filepath.IsAbs(p) {
+			out = append(out, filepath.Clean(p))
+			continue
+		}
+		base := c.dir
+		if base == "" {
+			base = "."
+		}
+		out = append(out, filepath.Clean(filepath.Join(base, p)))
+	}
+	return out
+}
+
+// SmellSettings resolves the built-in per-language defaults with the config's
+// global and per-language overrides.
+func (c *Config) SmellSettings() smell.Settings {
+	return smell.Resolve(c.Smells, c.LanguageSmells)
+}
+
+// LanguageBudget returns the configured per-language budgets keyed by canonical
+// language.
+func (c *Config) LanguageBudget() map[lang.Lang]map[string]Budget {
+	out := map[lang.Lang]map[string]Budget{}
+	for name, b := range c.LanguageBudgets {
+		l, ok := lang.Canonical(name)
+		if !ok {
+			continue
+		}
+		out[l] = b
+	}
+	return out
 }
 
 // Load reads, validates, and fills defaults for the given file.
@@ -46,6 +99,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Version != 1 {
 		return nil, fmt.Errorf("unsupported navune config version %d (want 1)", cfg.Version)
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		cfg.dir = filepath.Dir(abs)
 	}
 	return cfg, nil
 }
@@ -165,5 +221,38 @@ weights:
   max_duplication_pct:   20
   max_cycle_members:     20
   max_in_cycle_pct:      20
+
+# Structural smell rules (ADR 0016). All are enabled by default; none gate
+# unless a matching budget is configured. Each entry accepts enabled,
+# threshold and severity (blocker|high|medium|low|info).
+smells:
+  cognitive-complexity:  { enabled: true, threshold: 15, severity: high }
+  cyclomatic-complexity: { enabled: true, threshold: 10, severity: medium }
+  function-length:       { enabled: true, threshold: 60, severity: high }
+  nesting-depth:         { enabled: true, threshold: 4,  severity: medium }
+  parameter-count:       { enabled: true, threshold: 7,  severity: medium }
+  file-length:           { enabled: true, threshold: 750, severity: low }
+  duplicated-file:       { enabled: true, threshold: 10, severity: medium }
+  comment-density:       { enabled: true, threshold: 25, severity: low }
+  boolean-complexity:    { enabled: true, threshold: 3,  severity: medium }
+  too-many-methods:      { enabled: true, threshold: 35, severity: low }
+
+# Per-language threshold overrides (full rule objects; fields not set inherit
+# from the built-in per-language default, then the global smells entry).
+language_smells:
+  python:
+    function-length: { threshold: 50 }
+  typescript:
+    nesting-depth:   { threshold: 3 }
+
+# Per-language budgets, evaluated over that language's production files in
+# addition to the global budgets above. The composite uses global values only.
+language_budgets:
+  python:
+    avg_complexity: { limit: 8, tier: warn }
+
+# C/C++ #include search directories, relative to this config file (ADR 0017).
+include_paths:
+  - include
 `
 }
