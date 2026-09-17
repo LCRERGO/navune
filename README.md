@@ -117,13 +117,13 @@ Navune does not try to replace them.
 
 | Language              | Backend                   | Status |
 |-----------------------|---------------------------|--------|
-| Go                    | `go/parser` (pure Go)     | v1     |
-| TypeScript/JavaScript | tree-sitter (cgo)         | v1.1   |
-| Python                | tree-sitter (cgo)         | v1.1   |
-| C                     | tree-sitter (cgo)         | v1.2   |
-| C++                   | tree-sitter (cgo)         | v1.2   |
-| Java                  | tree-sitter (cgo)         | v1.3   |
-| Rust                  | tree-sitter (cgo)         | v1.3   |
+| Go                    | `go/parser` (pure Go)     | v1.0.0 |
+| TypeScript/JavaScript | tree-sitter (cgo)         | v1.0.0 |
+| Python                | tree-sitter (cgo)         | v1.0.0 |
+| C                     | tree-sitter (cgo)         | v1.0.0 |
+| C++                   | tree-sitter (cgo)         | v1.0.0 |
+| Java                  | tree-sitter (cgo)         | v1.1.0 |
+| Rust                  | tree-sitter (cgo)         | v1.1.0 |
 
 > Why tree-sitter (and cgo)? No importable pure-Go TypeScript parser exists
 > (esbuild's parser is `internal/` to its module), and tree-sitter's Go
@@ -339,14 +339,16 @@ See [`docs/development.md`](docs/development.md) and
 
 ## Roadmap
 
-- **v1** — Go, full metric model including duplication.
-- **v1.1** — TypeScript/JavaScript + Python via tree-sitter.
-- **v1.2** — extended structural measures (cognitive complexity, comments,
-  function shape, duplicated lines), the deterministic smell layer, and C/C++
-  ([ADR 0015](docs/adr/0015-extended-structural-measures.md),
+- **v1.0.0** — Go, TypeScript/JavaScript, Python, C and C++ via tree-sitter;
+  the full metric model including extended structural measures (cognitive
+  complexity, comment density, function shape, duplicated lines) and the
+  deterministic smell layer
+  ([ADR 0005](docs/adr/0005-full-metric-model.md),
+  [ADR 0015](docs/adr/0015-extended-structural-measures.md),
   [ADR 0016](docs/adr/0016-deterministic-smell-layer.md),
   [ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)).
-- **v1.3** — YAML output format and Java + Rust adapters
+- **v1.1.0** — YAML output ([ADR 0008](docs/adr/0008-report-formats.md)
+  revision 1) and Java + Rust adapters
   ([ADR 0019](docs/adr/0019-java-and-rust-adapters.md)).
 - **later** — HTML report; directory-level aggregation views.
 

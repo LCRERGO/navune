@@ -15,17 +15,17 @@ toolchain.
 
 ## Decision
 
-Navune targets **five languages** over its product lifetime:
+Navune targets **eight languages** over its product lifetime:
 
 | Language      | Backend                    | Status |
 |---------------|----------------------------|--------|
-| Go            | `go/parser` (pure Go)      | v1     |
-| TS/JavaScript | tree-sitter (cgo)          | v1.1   |
-| Python        | tree-sitter (cgo)          | v1.1   |
-| C             | tree-sitter (cgo)          | v1.2   |
-| C++           | tree-sitter (cgo)          | v1.2   |
-| Java          | tree-sitter (cgo)          | v1.3   |
-| Rust          | tree-sitter (cgo)          | v1.3   |
+| Go            | `go/parser` (pure Go)      | v1.0.0 |
+| TS/JavaScript | tree-sitter (cgo)          | v1.0.0 |
+| Python        | tree-sitter (cgo)          | v1.0.0 |
+| C             | tree-sitter (cgo)          | v1.0.0 |
+| C++           | tree-sitter (cgo)          | v1.0.0 |
+| Java          | tree-sitter (cgo)          | v1.1.0 |
+| Rust          | tree-sitter (cgo)          | v1.1.0 |
 
 **v1 ships Go only, with the full metric model. TS/JS and Python ship in the
 next release** via the official tree-sitter Go bindings; C → C++ land as
@@ -80,3 +80,10 @@ internal-only import/module resolution, a self-contained fixture, and
 evolution-suite coverage (ADR 0019). They ship in v1.3 alongside the YAML
 output format (ADR 0008 revision 1). The "five languages" framing is superseded
 by the table above.
+
+## Revision 5 (2026-09-17)
+
+Version labels are corrected against `CHANGELOG.md` (the release record): Go,
+TS/JS, Python, C and C++ shipped in **1.0.0**; Java, Rust and YAML output in
+**1.1.0**. The "v1.2"/"v1.3" labels in Revisions 3–4 were a stale staging plan
+and are superseded by the status table above.
