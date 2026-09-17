@@ -116,13 +116,15 @@ jobs:
             else
               binary="navune"
             fi
-            mkdir -p "stage/${target}"
+            mkdir -p "stage/${target}/completions" "stage/${target}/man"
             cp "$dir/${binary}" "stage/${target}/${binary}"
             cp LICENSE README.md "stage/${target}/"
+            cp completions/navune.bash "stage/${target}/completions/"
+            cp man/navune.1 "stage/${target}/man/"
             if [[ "$os" == "windows" ]]; then
-              (cd "stage/${target}" && zip -q "../../release/navune_${VERSION}_${os}_${arch}.zip" "${binary}" LICENSE README.md)
+              (cd "stage/${target}" && zip -qr "../../release/navune_${VERSION}_${os}_${arch}.zip" "${binary}" LICENSE README.md completions man)
             else
-              tar -czf "release/navune_${VERSION}_${os}_${arch}.tar.gz" -C "stage/${target}" "${binary}" LICENSE README.md
+              tar -czf "release/navune_${VERSION}_${os}_${arch}.tar.gz" -C "stage/${target}" "${binary}" LICENSE README.md completions man
             fi
           done
           (cd release && sha256sum navune_* > checksums.txt)
