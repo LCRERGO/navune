@@ -70,7 +70,7 @@ ARGUMENTS
 
 FLAGS
   --config FILE   navune.yaml to use; overrides upward discovery from <path>
-  --format FMT    report format: text (default), json, or mermaid
+  --format FMT    report format: text (default), json, yaml, or mermaid
   --out FILE      write the report to FILE instead of stdout
   --verbose, -v   add per-function detail (JSON functions array; text lists
                   functions that carry a smell)

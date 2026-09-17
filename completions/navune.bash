@@ -6,7 +6,7 @@
 _navune_commands="analyze init version help"
 _navune_global_flags="--help -h --version -V"
 _navune_analyze_flags="--config --format --out --verbose -v -h --help"
-_navune_formats="text json mermaid"
+_navune_formats="text json yaml mermaid"
 
 _navune() {
     local cur prev cmd i

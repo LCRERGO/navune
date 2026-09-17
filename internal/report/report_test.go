@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/lcr/navune/internal/analysis"
 	"github.com/lcr/navune/internal/config"
 )
@@ -73,8 +75,46 @@ func TestRenderMermaidContainsGraph(t *testing.T) {
 	}
 }
 
+// TestRenderYAMLEquivalentToJSON asserts the YAML contract mirrors the JSON
+// one exactly: decoding both into generic values must produce identical
+// structures (ADR 0008 revision).
+func TestRenderYAMLEquivalentToJSON(t *testing.T) {
+	r := fixtureReport(t)
+	jsonOut, err := Render(r, JSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlOut, err := Render(r, YAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.HasSuffix(yamlOut, "\n") {
+		t.Error("yaml output must not end with a newline, matching json")
+	}
+
+	var fromYAML, fromJSON any
+	if err := yaml.Unmarshal([]byte(yamlOut), &fromYAML); err != nil {
+		t.Fatalf("yaml must unmarshal: %v", err)
+	}
+	if err := json.Unmarshal([]byte(jsonOut), &fromJSON); err != nil {
+		t.Fatal(err)
+	}
+	// Normalize both through JSON so YAML ints and JSON floats compare equal.
+	yamlNorm, err := json.Marshal(fromYAML)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jsonNorm, err := json.Marshal(fromJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(yamlNorm) != string(jsonNorm) {
+		t.Errorf("yaml and json schemas diverge:\n yaml: %s\n json: %s", yamlNorm, jsonNorm)
+	}
+}
+
 func TestParseFormat(t *testing.T) {
-	for _, ok := range []string{"text", "json", "mermaid"} {
+	for _, ok := range []string{"text", "json", "yaml", "mermaid"} {
 		if _, err := ParseFormat(ok); err != nil {
 			t.Errorf("%s should parse", ok)
 		}

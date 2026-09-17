@@ -65,21 +65,21 @@ func init() {
 // BudgetResult is the evaluation of one configured budget. Language is "" for
 // global budgets and the canonical language key for per-language budgets.
 type BudgetResult struct {
-	Key      string  `json:"key"`
-	Label    string  `json:"label"`
-	Language string  `json:"language,omitempty"`
-	Limit    float64 `json:"limit"`
-	Value    float64 `json:"value"`
-	Tier     string  `json:"tier"`
-	Breached bool    `json:"breached"`
+	Key      string  `json:"key" yaml:"key"`
+	Label    string  `json:"label" yaml:"label"`
+	Language string  `json:"language,omitempty" yaml:"language,omitempty"`
+	Limit    float64 `json:"limit" yaml:"limit"`
+	Value    float64 `json:"value" yaml:"value"`
+	Tier     string  `json:"tier" yaml:"tier"`
+	Breached bool    `json:"breached" yaml:"breached"`
 }
 
 // Verdict is the outcome of evaluating all budgets against measured values.
 type Verdict struct {
-	Budgets  []BudgetResult `json:"budgets"`
-	Breaches []BudgetResult `json:"breaches"`
-	Score    float64        `json:"composite_score"` // 0-100, higher is better
-	ExitCode int            `json:"exit_code"`
+	Budgets  []BudgetResult `json:"budgets" yaml:"budgets"`
+	Breaches []BudgetResult `json:"breaches" yaml:"breaches"`
+	Score    float64        `json:"composite_score" yaml:"composite_score"` // 0-100, higher is better
+	ExitCode int            `json:"exit_code" yaml:"exit_code"`
 }
 
 // Validate ensures every budget/weight key in the config is known, and that

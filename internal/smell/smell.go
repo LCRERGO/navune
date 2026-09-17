@@ -163,13 +163,13 @@ type File struct {
 
 // Issue is one located smell finding.
 type Issue struct {
-	Rule      string  `json:"rule"`
-	Severity  string  `json:"severity"`
-	File      string  `json:"file"`
-	Line      int     `json:"line"`
-	Function  string  `json:"function,omitempty"`
-	Value     float64 `json:"value"`
-	Threshold float64 `json:"threshold"`
+	Rule      string  `json:"rule" yaml:"rule"`
+	Severity  string  `json:"severity" yaml:"severity"`
+	File      string  `json:"file" yaml:"file"`
+	Line      int     `json:"line" yaml:"line"`
+	Function  string  `json:"function,omitempty" yaml:"function,omitempty"`
+	Value     float64 `json:"value" yaml:"value"`
+	Threshold float64 `json:"threshold" yaml:"threshold"`
 }
 
 // Evaluate runs every enabled rule over the production files and returns

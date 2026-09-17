@@ -25,7 +25,7 @@ func TestPackagedArtifactsCoverCLISurface(t *testing.T) {
 		"--config", "--format", "--out", "--verbose",
 		"-v", "-h", "--help", "-V", "--version",
 		// --format values.
-		"text", "json", "mermaid",
+		"text", "json", "yaml", "mermaid",
 	}
 
 	for _, tok := range tokens {

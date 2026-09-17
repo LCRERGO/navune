@@ -28,143 +28,143 @@ import (
 
 // FileReport is one file's row in the report (production or test).
 type FileReport struct {
-	Path              string           `json:"path"`
-	Lang              string           `json:"lang"`
-	Class             string           `json:"class"` // "prod" | "test"
-	Package           string           `json:"package"`
-	ImportPath        string           `json:"import_path,omitempty"`
-	TotalLines        int              `json:"total_lines"`
-	PhysicalSLOC      int              `json:"physical_sloc"`
-	LogicalLOC        int              `json:"logical_loc"`
-	CommentLines      int              `json:"comment_lines"`
-	CommentPct        float64          `json:"comment_pct"`
-	Functions         int              `json:"functions"`
-	AvgComplexity     float64          `json:"avg_complexity"`
-	WorstComplex      int              `json:"worst_complexity"`
-	WorstFunc         string           `json:"worst_function,omitempty"`
-	AvgCognitive      float64          `json:"avg_cognitive_complexity"`
-	WorstCognitive    int              `json:"cognitive_complexity"`
-	MaxFunctionLength int              `json:"max_function_length"`
-	MaxNesting        int              `json:"max_nesting"`
-	MaxParams         int              `json:"max_params"`
-	Types             int              `json:"types"`
-	AbstractTypes     int              `json:"abstract_types"`
-	Ca                int              `json:"ca,omitempty"`
-	Ce                int              `json:"ce,omitempty"`
-	Instability       float64          `json:"instability,omitempty"`
-	Abstractness      float64          `json:"abstractness,omitempty"`
-	Distance          float64          `json:"distance,omitempty"`
-	InCycle           bool             `json:"in_cycle"`
-	CycleName         string           `json:"cycle,omitempty"`
-	DupTokens         int              `json:"dup_tokens"`
-	DupPct            float64          `json:"dup_pct"`
-	DuplicatedLines   int              `json:"duplicated_lines"`
-	FunctionsDetail   []FunctionReport `json:"functions_detail,omitempty"`
+	Path              string           `json:"path" yaml:"path"`
+	Lang              string           `json:"lang" yaml:"lang"`
+	Class             string           `json:"class" yaml:"class"` // "prod" | "test"
+	Package           string           `json:"package" yaml:"package"`
+	ImportPath        string           `json:"import_path,omitempty" yaml:"import_path,omitempty"`
+	TotalLines        int              `json:"total_lines" yaml:"total_lines"`
+	PhysicalSLOC      int              `json:"physical_sloc" yaml:"physical_sloc"`
+	LogicalLOC        int              `json:"logical_loc" yaml:"logical_loc"`
+	CommentLines      int              `json:"comment_lines" yaml:"comment_lines"`
+	CommentPct        float64          `json:"comment_pct" yaml:"comment_pct"`
+	Functions         int              `json:"functions" yaml:"functions"`
+	AvgComplexity     float64          `json:"avg_complexity" yaml:"avg_complexity"`
+	WorstComplex      int              `json:"worst_complexity" yaml:"worst_complexity"`
+	WorstFunc         string           `json:"worst_function,omitempty" yaml:"worst_function,omitempty"`
+	AvgCognitive      float64          `json:"avg_cognitive_complexity" yaml:"avg_cognitive_complexity"`
+	WorstCognitive    int              `json:"cognitive_complexity" yaml:"cognitive_complexity"`
+	MaxFunctionLength int              `json:"max_function_length" yaml:"max_function_length"`
+	MaxNesting        int              `json:"max_nesting" yaml:"max_nesting"`
+	MaxParams         int              `json:"max_params" yaml:"max_params"`
+	Types             int              `json:"types" yaml:"types"`
+	AbstractTypes     int              `json:"abstract_types" yaml:"abstract_types"`
+	Ca                int              `json:"ca,omitempty" yaml:"ca,omitempty"`
+	Ce                int              `json:"ce,omitempty" yaml:"ce,omitempty"`
+	Instability       float64          `json:"instability,omitempty" yaml:"instability,omitempty"`
+	Abstractness      float64          `json:"abstractness,omitempty" yaml:"abstractness,omitempty"`
+	Distance          float64          `json:"distance,omitempty" yaml:"distance,omitempty"`
+	InCycle           bool             `json:"in_cycle" yaml:"in_cycle"`
+	CycleName         string           `json:"cycle,omitempty" yaml:"cycle,omitempty"`
+	DupTokens         int              `json:"dup_tokens" yaml:"dup_tokens"`
+	DupPct            float64          `json:"dup_pct" yaml:"dup_pct"`
+	DuplicatedLines   int              `json:"duplicated_lines" yaml:"duplicated_lines"`
+	FunctionsDetail   []FunctionReport `json:"functions_detail,omitempty" yaml:"functions_detail,omitempty"`
 }
 
 // FunctionReport is per-function detail emitted only with --verbose.
 type FunctionReport struct {
-	Name       string `json:"name"`
-	Enclosing  string `json:"enclosing,omitempty"`
-	StartLine  int    `json:"start_line"`
-	EndLine    int    `json:"end_line"`
-	Complexity int    `json:"complexity"`
-	Cognitive  int    `json:"cognitive_complexity"`
-	Length     int    `json:"length"`
-	Nesting    int    `json:"nesting"`
-	Params     int    `json:"params"`
-	Anonymous  bool   `json:"anonymous,omitempty"`
+	Name       string `json:"name" yaml:"name"`
+	Enclosing  string `json:"enclosing,omitempty" yaml:"enclosing,omitempty"`
+	StartLine  int    `json:"start_line" yaml:"start_line"`
+	EndLine    int    `json:"end_line" yaml:"end_line"`
+	Complexity int    `json:"complexity" yaml:"complexity"`
+	Cognitive  int    `json:"cognitive_complexity" yaml:"cognitive_complexity"`
+	Length     int    `json:"length" yaml:"length"`
+	Nesting    int    `json:"nesting" yaml:"nesting"`
+	Params     int    `json:"params" yaml:"params"`
+	Anonymous  bool   `json:"anonymous,omitempty" yaml:"anonymous,omitempty"`
 }
 
 // CycleReport describes one strongly connected component.
 type CycleReport struct {
-	Index   int      `json:"index"`
-	Size    int      `json:"size"`
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
+	Index   int      `json:"index" yaml:"index"`
+	Size    int      `json:"size" yaml:"size"`
+	Name    string   `json:"name" yaml:"name"`
+	Members []string `json:"members" yaml:"members"`
 }
 
 // Summary is the codebase-level aggregation (production code only).
 type Summary struct {
-	ProdFiles         int                        `json:"prod_files"`
-	TestFiles         int                        `json:"test_files"`
-	SkippedDirs       int                        `json:"skipped_dirs"`
-	GeneratedFiles    int                        `json:"generated_files"`
-	PhysicalSLOC      int                        `json:"physical_sloc"`
-	LogicalLOC        int                        `json:"logical_loc"`
-	CommentLines      int                        `json:"comment_lines"`
-	CommentPct        float64                    `json:"comment_pct"`
-	Functions         int                        `json:"functions"`
-	AvgComplexity     float64                    `json:"avg_complexity"`
-	WorstComplexity   int                        `json:"worst_complexity"`
-	WorstFunction     string                     `json:"worst_function,omitempty"`
-	AvgCognitive      float64                    `json:"avg_cognitive_complexity"`
-	WorstCognitive    int                        `json:"worst_cognitive_complexity"`
-	MaxFunctionLength int                        `json:"max_function_length"`
-	MaxNesting        int                        `json:"max_nesting"`
-	MaxParams         int                        `json:"max_params"`
-	Types             int                        `json:"types"`
-	AbstractTypes     int                        `json:"abstract_types"`
-	TotalTokens       int                        `json:"total_tokens"`
-	DupTokens         int                        `json:"dup_tokens"`
-	DupPct            float64                    `json:"dup_pct"`
-	DupBlocks         int                        `json:"dup_blocks"`
-	DuplicatedLines   int                        `json:"duplicated_lines"`
-	IssueCount        int                        `json:"issue_count"`
-	Cycles            int                        `json:"cycles"`
-	FilesInCycle      int                        `json:"files_in_cycle"`
-	MaxCycleMembers   int                        `json:"max_cycle_members"`
-	InCyclePct        float64                    `json:"in_cycle_pct"`
-	ByLanguage        map[string]LanguageSummary `json:"by_language,omitempty"`
+	ProdFiles         int                        `json:"prod_files" yaml:"prod_files"`
+	TestFiles         int                        `json:"test_files" yaml:"test_files"`
+	SkippedDirs       int                        `json:"skipped_dirs" yaml:"skipped_dirs"`
+	GeneratedFiles    int                        `json:"generated_files" yaml:"generated_files"`
+	PhysicalSLOC      int                        `json:"physical_sloc" yaml:"physical_sloc"`
+	LogicalLOC        int                        `json:"logical_loc" yaml:"logical_loc"`
+	CommentLines      int                        `json:"comment_lines" yaml:"comment_lines"`
+	CommentPct        float64                    `json:"comment_pct" yaml:"comment_pct"`
+	Functions         int                        `json:"functions" yaml:"functions"`
+	AvgComplexity     float64                    `json:"avg_complexity" yaml:"avg_complexity"`
+	WorstComplexity   int                        `json:"worst_complexity" yaml:"worst_complexity"`
+	WorstFunction     string                     `json:"worst_function,omitempty" yaml:"worst_function,omitempty"`
+	AvgCognitive      float64                    `json:"avg_cognitive_complexity" yaml:"avg_cognitive_complexity"`
+	WorstCognitive    int                        `json:"worst_cognitive_complexity" yaml:"worst_cognitive_complexity"`
+	MaxFunctionLength int                        `json:"max_function_length" yaml:"max_function_length"`
+	MaxNesting        int                        `json:"max_nesting" yaml:"max_nesting"`
+	MaxParams         int                        `json:"max_params" yaml:"max_params"`
+	Types             int                        `json:"types" yaml:"types"`
+	AbstractTypes     int                        `json:"abstract_types" yaml:"abstract_types"`
+	TotalTokens       int                        `json:"total_tokens" yaml:"total_tokens"`
+	DupTokens         int                        `json:"dup_tokens" yaml:"dup_tokens"`
+	DupPct            float64                    `json:"dup_pct" yaml:"dup_pct"`
+	DupBlocks         int                        `json:"dup_blocks" yaml:"dup_blocks"`
+	DuplicatedLines   int                        `json:"duplicated_lines" yaml:"duplicated_lines"`
+	IssueCount        int                        `json:"issue_count" yaml:"issue_count"`
+	Cycles            int                        `json:"cycles" yaml:"cycles"`
+	FilesInCycle      int                        `json:"files_in_cycle" yaml:"files_in_cycle"`
+	MaxCycleMembers   int                        `json:"max_cycle_members" yaml:"max_cycle_members"`
+	InCyclePct        float64                    `json:"in_cycle_pct" yaml:"in_cycle_pct"`
+	ByLanguage        map[string]LanguageSummary `json:"by_language,omitempty" yaml:"by_language,omitempty"`
 }
 
 // LanguageSummary repeats the size, complexity, comment, duplication, and
 // issue aggregates for one language. Cycle and coupling metrics are excluded:
 // they are inherently cross-language (ADR 0016).
 type LanguageSummary struct {
-	ProdFiles         int     `json:"prod_files"`
-	PhysicalSLOC      int     `json:"physical_sloc"`
-	LogicalLOC        int     `json:"logical_loc"`
-	CommentLines      int     `json:"comment_lines"`
-	CommentPct        float64 `json:"comment_pct"`
-	Functions         int     `json:"functions"`
-	AvgComplexity     float64 `json:"avg_complexity"`
-	WorstComplexity   int     `json:"worst_complexity"`
-	AvgCognitive      float64 `json:"avg_cognitive_complexity"`
-	WorstCognitive    int     `json:"worst_cognitive_complexity"`
-	MaxFunctionLength int     `json:"max_function_length"`
-	MaxNesting        int     `json:"max_nesting"`
-	MaxParams         int     `json:"max_params"`
-	Types             int     `json:"types"`
-	AbstractTypes     int     `json:"abstract_types"`
-	TotalTokens       int     `json:"total_tokens"`
-	DupTokens         int     `json:"dup_tokens"`
-	DupPct            float64 `json:"dup_pct"`
-	DuplicatedLines   int     `json:"duplicated_lines"`
-	IssueCount        int     `json:"issue_count"`
+	ProdFiles         int     `json:"prod_files" yaml:"prod_files"`
+	PhysicalSLOC      int     `json:"physical_sloc" yaml:"physical_sloc"`
+	LogicalLOC        int     `json:"logical_loc" yaml:"logical_loc"`
+	CommentLines      int     `json:"comment_lines" yaml:"comment_lines"`
+	CommentPct        float64 `json:"comment_pct" yaml:"comment_pct"`
+	Functions         int     `json:"functions" yaml:"functions"`
+	AvgComplexity     float64 `json:"avg_complexity" yaml:"avg_complexity"`
+	WorstComplexity   int     `json:"worst_complexity" yaml:"worst_complexity"`
+	AvgCognitive      float64 `json:"avg_cognitive_complexity" yaml:"avg_cognitive_complexity"`
+	WorstCognitive    int     `json:"worst_cognitive_complexity" yaml:"worst_cognitive_complexity"`
+	MaxFunctionLength int     `json:"max_function_length" yaml:"max_function_length"`
+	MaxNesting        int     `json:"max_nesting" yaml:"max_nesting"`
+	MaxParams         int     `json:"max_params" yaml:"max_params"`
+	Types             int     `json:"types" yaml:"types"`
+	AbstractTypes     int     `json:"abstract_types" yaml:"abstract_types"`
+	TotalTokens       int     `json:"total_tokens" yaml:"total_tokens"`
+	DupTokens         int     `json:"dup_tokens" yaml:"dup_tokens"`
+	DupPct            float64 `json:"dup_pct" yaml:"dup_pct"`
+	DuplicatedLines   int     `json:"duplicated_lines" yaml:"duplicated_lines"`
+	IssueCount        int     `json:"issue_count" yaml:"issue_count"`
 }
 
 // Report is Navune's stable output contract (schema_version 1).
 type Report struct {
-	SchemaVersion int                 `json:"schema_version"`
-	Tool          string              `json:"tool"`
-	Root          string              `json:"root"`
-	ModulePath    string              `json:"module_path,omitempty"`
-	InModule      bool                `json:"in_module"`
-	Summary       Summary             `json:"summary"`
-	Files         []FileReport        `json:"files"`
-	Cycles        []CycleReport       `json:"cycles"`
-	Issues        []smell.Issue       `json:"issues"`
-	Budgets       []gate.BudgetResult `json:"budgets"`
-	Composite     float64             `json:"composite"`
-	ExitCode      int                 `json:"exit_code"`
+	SchemaVersion int                 `json:"schema_version" yaml:"schema_version"`
+	Tool          string              `json:"tool" yaml:"tool"`
+	Root          string              `json:"root" yaml:"root"`
+	ModulePath    string              `json:"module_path,omitempty" yaml:"module_path,omitempty"`
+	InModule      bool                `json:"in_module" yaml:"in_module"`
+	Summary       Summary             `json:"summary" yaml:"summary"`
+	Files         []FileReport        `json:"files" yaml:"files"`
+	Cycles        []CycleReport       `json:"cycles" yaml:"cycles"`
+	Issues        []smell.Issue       `json:"issues" yaml:"issues"`
+	Budgets       []gate.BudgetResult `json:"budgets" yaml:"budgets"`
+	Composite     float64             `json:"composite" yaml:"composite"`
+	ExitCode      int                 `json:"exit_code" yaml:"exit_code"`
 
 	// Verbose controls whether per-function detail is populated.
-	Verbose bool `json:"-"`
+	Verbose bool `json:"-" yaml:"-"`
 
 	// InternalEdges carries internal file->file dependencies for the Mermaid
 	// renderer only; it is excluded from the JSON schema.
-	InternalEdges [][2]string `json:"-"`
+	InternalEdges [][2]string `json:"-" yaml:"-"`
 }
 
 // Options controls optional analysis behavior.

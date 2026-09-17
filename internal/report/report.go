@@ -1,5 +1,5 @@
 // Package report renders the analysis.Report (ADR 0008) as text, versioned
-// JSON, or Mermaid graph export.
+// JSON or YAML, or Mermaid graph export.
 package report
 
 import (
@@ -16,16 +16,17 @@ type Format string
 const (
 	Text    Format = "text"
 	JSON    Format = "json"
+	YAML    Format = "yaml"
 	Mermaid Format = "mermaid"
 )
 
 // ParseFormat validates a --format flag value.
 func ParseFormat(s string) (Format, error) {
 	switch Format(s) {
-	case Text, JSON, Mermaid:
+	case Text, JSON, YAML, Mermaid:
 		return Format(s), nil
 	}
-	return "", fmt.Errorf("unknown format %q (want text, json or mermaid)", s)
+	return "", fmt.Errorf("unknown format %q (want text, json, yaml or mermaid)", s)
 }
 
 // Render emits the report in the requested format.
@@ -35,6 +36,8 @@ func Render(r *analysis.Report, f Format) (string, error) {
 		return renderText(r), nil
 	case JSON:
 		return renderJSON(r)
+	case YAML:
+		return renderYAML(r)
 	case Mermaid:
 		return renderMermaid(r)
 	}
