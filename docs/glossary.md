@@ -122,3 +122,15 @@ formulas behind every number Navune reports.
 - **--verbose / -v** — adds per-function detail: a `functions_detail` array in JSON,
   and functions carrying smells in the text report. `-V` prints the version
   (ADR 0016).
+
+## Verification
+
+- **Constraint test** — an always-on test that asserts a documented invariant
+  (from an ADR) holds for Navune's analysis of **its own repository**, rather
+  than exercising a target project's behavior. The suite lives in
+  `internal/constraints` and runs in the default `go test ./...` bar
+  (ADR 0013 revision 1).
+- **Golden fixture** — a small self-contained module under `test/` used as
+  committed synthetic test data, analyzed by integration tests (ADR 0013).
+- **Self-analysis smoke test** — Navune analyzing its own source tree on every
+  CI run (ADR 0013).

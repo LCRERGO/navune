@@ -45,6 +45,13 @@ make install-completions
 make install-man
 ```
 
+`make test` includes the **constraint suite** (`internal/constraints`): it
+analyzes this repository and asserts the documented invariants — determinism,
+the frozen schema field set, ordering, test-namespace exclusion, internal-only
+edges, canonical language keys, upper-bound-only budgets, and the smell
+contract. It is the place to encode a new ADR invariant; see
+[ADR 0013](adr/0013-verification-bar.md).
+
 cgo is mandatory (tree-sitter grammars); do not try `CGO_ENABLED=0`.
 
 ## Releasing

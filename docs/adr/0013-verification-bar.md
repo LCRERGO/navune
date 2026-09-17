@@ -33,3 +33,14 @@ itself).
 - Regression safety for every metric formula via golden files.
 - Performance is a tracked contract, not a hope.
 - Fixture growth is cheap because fixtures are small and synthetic.
+
+## Revision 1 (2026-09-17)
+
+An always-on **constraint suite** (`internal/constraints`) complements the golden
+fixtures and the self-analysis smoke test. It analyzes Navune's own repository
+and asserts the documented invariants rather than exercising a target project:
+byte-stable determinism across every renderer, the frozen JSON/YAML field set,
+stable ordering, test-namespace exclusion, internal-only edges, canonical
+language keys, upper-bound-only budgets, and the smell/issue contract. It runs
+in the default `go test ./...` bar. The suite asserts invariants only — it does
+not introduce a new output format or a user-facing feature.
