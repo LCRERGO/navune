@@ -2,15 +2,16 @@ package analysis
 
 import (
 	"path"
+	"path/filepath"
 	"strings"
 
+	"github.com/lcr/navune/internal/config"
 	"github.com/lcr/navune/internal/lang"
 )
 
-// resolveScriptDeps computes, for every production TS/JS/Python file, the set
-// of internal files it depends on (ADR 0010: internal edges only). Resolution
-// is best-effort and workspace-root based (ADR 0002 revision): a specifier is
-// internal only if it maps to a file that was actually analyzed.
+// resolveDeps computes, for every production file, the set of internal files
+// it depends on (ADR 0010: internal edges only). Resolution is best-effort: a
+// specifier is internal only if it maps to a file that was actually analyzed.
 //
 // TS/JS: only relative specifiers (./ ../) resolve; bare package specifiers
 // (e.g. "react") are external. Candidates honour extension omission and
@@ -19,21 +20,86 @@ import (
 // Python: dotted imports (os.path, a.b) resolve under the analysis root as
 // a/b.py or a/b/__init__.py; relative imports (., ..) resolve against the
 // importing file's directory. Anything else is external.
-func resolveScriptDeps(files []*lang.FileResult) {
-	// set of analyzed production rel-paths, per relevant family, for fast
-	// existence checks.
+//
+// C/C++: quoted #include paths resolve relative to the including file, then
+// against the configured include_paths; angle includes only against
+// include_paths (ADR 0017).
+func resolveDeps(files []*lang.FileResult, cfg *config.Config, root string) {
 	has := map[string]bool{}
 	for _, f := range files {
 		has[f.Path] = true
 	}
+	includeDirs := includeDirsRelToRoot(cfg, root)
 	for _, f := range files {
 		switch f.Lang {
 		case lang.TypeScript, lang.JavaScript:
 			f.Deps = resolveTSDeps(f, has)
 		case lang.Python:
 			f.Deps = resolvePyDeps(f, has)
+		case lang.C, lang.CPP:
+			f.Deps = resolveCDeps(f, has, includeDirs)
 		}
 	}
+}
+
+// includeDirsRelToRoot converts configured include directories to paths
+// relative to the analysis root; directories outside the root cannot resolve
+// to analyzed files and are dropped.
+func includeDirsRelToRoot(cfg *config.Config, root string) []string {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, d := range cfg.IncludeDirs() {
+		rel, err := filepath.Rel(absRoot, d)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if strings.HasPrefix(rel, "..") {
+			continue
+		}
+		if rel == "." {
+			rel = ""
+		}
+		out = append(out, rel)
+	}
+	return out
+}
+
+// resolveCDeps resolves C/C++ #include directives. Angle includes are stored
+// wrapped in <...> by the adapter; quoted includes are bare.
+func resolveCDeps(f *lang.FileResult, has map[string]bool, includeDirs []string) []string {
+	dir := path.Dir(f.Path)
+	if dir == "." {
+		dir = ""
+	}
+	var deps []string
+	seen := map[string]bool{}
+	for _, imp := range f.Imports {
+		angle := strings.HasPrefix(imp, "<") && strings.HasSuffix(imp, ">")
+		inc := strings.TrimSuffix(strings.TrimPrefix(imp, "<"), ">")
+		var bases []string
+		if !angle {
+			bases = append(bases, path.Join(dir, inc))
+		}
+		for _, id := range includeDirs {
+			bases = append(bases, path.Join(id, inc))
+		}
+		for _, b := range bases {
+			b = path.Clean(b)
+			if b == "." || b == "" {
+				continue
+			}
+			if has[b] && !seen[b] {
+				seen[b] = true
+				deps = append(deps, b)
+				break
+			}
+		}
+	}
+	return deps
 }
 
 func resolveTSDeps(f *lang.FileResult, has map[string]bool) []string {

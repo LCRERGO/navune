@@ -20,6 +20,9 @@ const DefaultMinTokens = 20
 type Result struct {
 	// ByFile holds per-file duplicated-token counts, aligned with the input.
 	ByFile []int
+	// DupLinesByFile holds per-file duplicated physical-line counts, aligned
+	// with the input.
+	DupLinesByFile []int
 	// Blocks is the number of distinct maximal duplicated blocks found.
 	Blocks int
 	// TotalTokens is the sum of tokens across all input files.
@@ -142,16 +145,19 @@ func (e *Engine) Detect(files [][]lang.Token) *Result {
 		}
 	}
 
-	res := &Result{ByFile: make([]int, n), TotalTokens: total}
+	res := &Result{ByFile: make([]int, n), DupLinesByFile: make([]int, n), TotalTokens: total}
 	dupTotal := 0
 	for f := 0; f < n; f++ {
 		c := 0
-		for _, b := range covered[f] {
+		lines := map[int]bool{}
+		for i, b := range covered[f] {
 			if b {
 				c++
+				lines[files[f][i].Line] = true
 			}
 		}
 		res.ByFile[f] = c
+		res.DupLinesByFile[f] = len(lines)
 		dupTotal += c
 	}
 	res.DupTokens = dupTotal

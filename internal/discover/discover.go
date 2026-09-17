@@ -43,6 +43,15 @@ var extLang = map[string]lang.Lang{
 	".mjs": lang.JavaScript,
 	".cjs": lang.JavaScript,
 	".py":  lang.Python,
+	".c":   lang.C,
+	".cc":  lang.CPP,
+	".cpp": lang.CPP,
+	".cxx": lang.CPP,
+	".c++": lang.CPP,
+	".hpp": lang.CPP,
+	".hh":  lang.CPP,
+	".hxx": lang.CPP,
+	".h":   lang.CPP, // ambiguous: the cfamily adapter sniffs C vs C++ (ADR 0017)
 }
 
 // Walk collects analyzable source files under root, honouring config
@@ -110,8 +119,13 @@ func hasGoMod(dir string) bool {
 	return false
 }
 
-// IsTestFile applies language-aware test classification by filename.
+// IsTestFile applies language-aware test classification. A file is a test if it
+// sits under a test/tests path component below the analysis root (any language,
+// ADR 0011 revision 1) or if its filename matches the language's pattern.
 func IsTestFile(f File) bool {
+	if underTestDir(f.RelPath) {
+		return true
+	}
 	base := f.RelPath
 	switch f.Lang {
 	case lang.Go:
@@ -125,6 +139,22 @@ func IsTestFile(f File) bool {
 			if idx > 0 {
 				return true
 			}
+		}
+	case lang.C, lang.CPP:
+		b := filepath.Base(base)
+		return strings.HasPrefix(b, "test_") || strings.Contains(b, "_test.")
+	}
+	return false
+}
+
+// underTestDir reports whether any directory component of a root-relative path
+// is exactly "test" or "tests". The analysis root's own name is not part of a
+// relative path, so it is never considered.
+func underTestDir(rel string) bool {
+	parts := strings.Split(rel, "/")
+	for i := 0; i < len(parts)-1; i++ {
+		if parts[i] == "test" || parts[i] == "tests" {
+			return true
 		}
 	}
 	return false

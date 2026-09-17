@@ -73,3 +73,36 @@ func containsSub(s, sub string) bool {
 	}
 	return false
 }
+
+func TestAnalyzeCFixture(t *testing.T) {
+	root := filepath.Join("..", "..", "test", "fixture-c")
+	r, err := Analyze(root, config.Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := r.Summary
+	if s.ProdFiles != 4 {
+		t.Errorf("want 4 C prod files, got %d", s.ProdFiles)
+	}
+	if s.TestFiles != 1 {
+		t.Errorf("want 1 C test file, got %d", s.TestFiles)
+	}
+	if s.GeneratedFiles != 1 {
+		t.Errorf("want 1 generated file, got %d", s.GeneratedFiles)
+	}
+	if s.Cycles != 1 || s.MaxCycleMembers != 3 {
+		t.Errorf("want 1 3-file include cycle, got cycles=%d max=%d", s.Cycles, s.MaxCycleMembers)
+	}
+	// .h files sniff as C (no C++ markers), so lang is "c" not "cpp"
+	for _, f := range r.Files {
+		if f.Class == "prod" && f.Lang != "c" {
+			t.Errorf("file %s lang = %q, want c", f.Path, f.Lang)
+		}
+	}
+	// vendor must be excluded
+	for _, f := range r.Files {
+		if containsSub(f.Path, "vendor") {
+			t.Errorf("vendor file analyzed: %s", f.Path)
+		}
+	}
+}
