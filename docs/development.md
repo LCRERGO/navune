@@ -11,6 +11,8 @@ internal/lang/golang     Go adapter over go/parser (pure Go)
 internal/lang/treescript TS/JS adapter over tree-sitter JS/TS grammars (cgo)
 internal/lang/python     Python adapter over the tree-sitter Python grammar (cgo)
 internal/lang/cfamily    C/C++ adapter over tree-sitter C/C++ grammars (cgo, shared)
+internal/lang/java       Java adapter over the tree-sitter Java grammar (cgo)
+internal/lang/rust       Rust adapter over the tree-sitter Rust grammar (cgo)
 internal/discover        file walking, exclusions, nested-module detection, test classification
 internal/analysis        pipeline orchestration; script import resolution; the Report model
 internal/dup             token-normalized duplication detection
@@ -71,9 +73,11 @@ and packages everything as a workflow artifact but creates no release.
 
 - **File is the unit of analysis** in every language (ADR 0006).
 - Only **internal edges** participate in graph metrics and gates; unresolved
-  imports (stdlib, `node_modules`, site-packages, system headers) never create
-  edges (ADR 0010). C/C++ `#include` resolution is quoted-relative plus
-  `include_paths` (ADR 0017).
+  imports (stdlib, `node_modules`, site-packages, system headers, external
+  crates, JDK packages) never create edges (ADR 0010). C/C++ `#include`
+  resolution is quoted-relative plus `include_paths` (ADR 0017); Java imports
+  resolve against declared `package` clauses and Rust `mod`/`use` paths against
+  the file tree (ADR 0019).
 - **Test files** are analyzed but reported in a separate `tests` namespace —
   excluded from budgets, cycles, coupling, the composite, and the smell layer
   (ADR 0011). Test classification is filename patterns **or** a `test`/`tests`

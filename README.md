@@ -4,12 +4,11 @@
 
 Navune (NAV + UNE, from Latin *nāvis*, "ship/navigate") is a command-line
 analyzer that computes *structural quality* metrics for Go,
-TypeScript/JavaScript, and Python codebases: size, cyclomatic and cognitive
-complexity, comment density, function shape, duplication, internal dependency
-graphs, cyclic dependencies, and Martin's coupling metrics. It judges the result
-against configurable budgets, reports deterministic structural smells, and emits
-a transparent 0–100 composite score. C and C++ are designed via a shared
-tree-sitter adapter and land on the roadmap.
+TypeScript/JavaScript, Python, C, C++, Java, and Rust codebases: size,
+cyclomatic and cognitive complexity, comment density, function shape,
+duplication, internal dependency graphs, cyclic dependencies, and Martin's
+coupling metrics. It judges the result against configurable budgets, reports
+deterministic structural smells, and emits a transparent 0–100 composite score.
 
 - [Quickstart](#quickstart)
 - [Why structural quality?](#why-structural-quality)
@@ -123,6 +122,8 @@ Navune does not try to replace them.
 | Python                | tree-sitter (cgo)         | v1.1   |
 | C                     | tree-sitter (cgo)         | v1.2   |
 | C++                   | tree-sitter (cgo)         | v1.2   |
+| Java                  | tree-sitter (cgo)         | v1.3   |
+| Rust                  | tree-sitter (cgo)         | v1.3   |
 
 > Why tree-sitter (and cgo)? No importable pure-Go TypeScript parser exists
 > (esbuild's parser is `internal/` to its module), and tree-sitter's Go
@@ -134,15 +135,22 @@ Navune does not try to replace them.
 > C/C++ use one shared `internal/lang/cfamily` adapter over the
 > `tree-sitter-c`/`tree-sitter-cpp` grammars, with `#include` resolved quoted-
 > relative and against `include_paths`; `.h` files are content-sniffed
-> ([ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)).
+> ([ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)). Java and Rust have their
+> own adapters ([ADR 0019](docs/adr/0019-java-and-rust-adapters.md)): Java
+> imports resolve against a package index built from declared `package`
+> clauses, and Rust `mod`/`use` paths resolve against the file tree
+> (`crate::` under `src/`). Inline Rust `#[cfg(test)]` code is counted as
+> production — the file-level unit cannot separate it.
 
 ## Output formats
 
-`navune analyze --format <text|json|mermaid>`:
+`navune analyze --format <text|json|yaml|mermaid>`:
 
 - **text** (default) — the human-readable summary shown in the quickstart.
 - **json** — a stable, versioned schema (`schema_version: 1`), the machine
   contract for CI and other tools.
+- **yaml** — the same `schema_version: 1` schema serialized as YAML, for
+  config-adjacent consumers; a second machine contract (ADR 0008 revision 1).
 - **mermaid** — a `flowchart` of the internal dependency graph. Files that
   participate in a cycle are grouped into per-cycle subgraphs, so structural
   debt is visible in your editor:
@@ -287,12 +295,14 @@ internal/              private application & analysis code (not importable by ot
   lang/treescript      TS/JS adapter over the tree-sitter JS/TS grammars
   lang/python          Python adapter over the tree-sitter Python grammar
   lang/cfamily         C/C++ adapter over the tree-sitter C/C++ grammars (shared)
+  lang/java            Java adapter over the tree-sitter Java grammar
+  lang/rust            Rust adapter over the tree-sitter Rust grammar
   report               text summary, versioned JSON schema, Mermaid graph export
 configs/               sample navune.yaml configuration
 docs/                  usage, metrics, glossary, ADRs and contributor guide
 test/                  external test data: committed golden fixtures
-                       (fixture/ Go, fixture-ts/, fixture-py/, fixture-c/),
-                       nested modules
+                       (fixture/ Go, fixture-ts/, fixture-py/, fixture-c/,
+                       fixture-java/, fixture-rust/), nested modules
 ```
 
 Language adapters convert a parsed AST into Navune's uniform element model and
@@ -336,6 +346,8 @@ See [`docs/development.md`](docs/development.md) and
   ([ADR 0015](docs/adr/0015-extended-structural-measures.md),
   [ADR 0016](docs/adr/0016-deterministic-smell-layer.md),
   [ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)).
+- **v1.3** — YAML output format and Java + Rust adapters
+  ([ADR 0019](docs/adr/0019-java-and-rust-adapters.md)).
 - **later** — HTML report; directory-level aggregation views.
 
 ## Design record

@@ -24,6 +24,8 @@ Navune targets **five languages** over its product lifetime:
 | Python        | tree-sitter (cgo)          | v1.1   |
 | C             | tree-sitter (cgo)          | v1.2   |
 | C++           | tree-sitter (cgo)          | v1.2   |
+| Java          | tree-sitter (cgo)          | v1.3   |
+| Rust          | tree-sitter (cgo)          | v1.3   |
 
 **v1 ships Go only, with the full metric model. TS/JS and Python ship in the
 next release** via the official tree-sitter Go bindings; C → C++ land as
@@ -69,3 +71,12 @@ C and C++ move from "later" to a concrete design: a single shared
 quoted-relative and against a new `include_paths` config key; C has no type
 layer, C++ does. Both implement the full measure set, including the extended
 measures of ADR 0015 and the smell layer of ADR 0016. Both ship in v1.2.
+
+## Revision 4 (2026-09-17)
+
+Java and Rust join the target set as dedicated tree-sitter adapters
+(`internal/lang/java`, `internal/lang/rust`), each with the full measure set,
+internal-only import/module resolution, a self-contained fixture, and
+evolution-suite coverage (ADR 0019). They ship in v1.3 alongside the YAML
+output format (ADR 0008 revision 1). The "five languages" framing is superseded
+by the table above.

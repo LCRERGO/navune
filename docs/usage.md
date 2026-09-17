@@ -27,7 +27,7 @@ report to stdout.
 | Option          | Description                                                     |
 |-----------------|-----------------------------------------------------------------|
 | `--config FILE` | Use `FILE` instead of discovering `navune.yaml` upward from the target. |
-| `--format FMT`  | Output format: `text` (default), `json`, or `mermaid`.          |
+| `--format FMT`  | Output format: `text` (default), `json`, `yaml`, or `mermaid`.  |
 | `--out FILE`    | Write the report to `FILE` instead of stdout.                     |
 | `--verbose`, `-v` | Add per-function detail: a `functions_detail` array per file in JSON, and functions carrying smells in the text report. |
 
@@ -82,8 +82,9 @@ and `include_paths` (ADR 0016, ADR 0017).
 # Analyze the current directory (default text report, exit code gates CI).
 navune analyze .
 
-# Machine-readable report for CI consumers.
+# Machine-readable report for CI consumers (json and yaml share one schema).
 navune analyze ./src --format json
+navune analyze ./src --format yaml
 
 # Per-function detail (JSON gains a functions_detail array; text lists functions with smells).
 navune analyze . --verbose
