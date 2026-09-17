@@ -36,3 +36,13 @@ attempt to replace.
   scanner" in docs and README.
 - Complexity, duplication, size, coupling, and cycle metrics are the core
   deliverables (see ADR 0005).
+
+## Revision 1 (2026-09-17)
+
+The bug/security exclusion stands: Navune still does not hunt bugs,
+vulnerabilities, or security hotspots. The blanket exclusion of **code smells**,
+however, is narrowed. A deterministic, structural smell layer (ADR 0016) —
+threshold rules over the measures of ADR 0015 — is now in scope. "Smells" here
+means structural threshold breaches, not pattern-matching heuristics: Navune is
+still not a linter, and remains defensible without a hand-written rule
+database.

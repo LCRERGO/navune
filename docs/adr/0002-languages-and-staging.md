@@ -22,8 +22,8 @@ Navune targets **five languages** over its product lifetime:
 | Go            | `go/parser` (pure Go)      | v1     |
 | TS/JavaScript | tree-sitter (cgo)          | v1.1   |
 | Python        | tree-sitter (cgo)          | v1.1   |
-| C             | tree-sitter (cgo)          | later  |
-| C++           | tree-sitter (cgo)          | later  |
+| C             | tree-sitter (cgo)          | v1.2   |
+| C++           | tree-sitter (cgo)          | v1.2   |
 
 **v1 ships Go only, with the full metric model. TS/JS and Python ship in the
 next release** via the official tree-sitter Go bindings; C → C++ land as
@@ -60,3 +60,12 @@ traded for real multi-language structural analysis.
 - Import/dependency resolution for TS/JS and Python is best-effort and
   workspace-root based (relative specifiers and dotted modules mapped to
   analyzed files); unresolved references count as external (ADR 0010).
+
+## Revision 3 (2026-09-17)
+
+C and C++ move from "later" to a concrete design: a single shared
+`internal/lang/cfamily` tree-sitter adapter over the `tree-sitter-c` and
+`tree-sitter-cpp` grammars (ADR 0017). Edges come from `#include`, resolved
+quoted-relative and against a new `include_paths` config key; C has no type
+layer, C++ does. Both implement the full measure set, including the extended
+measures of ADR 0015 and the smell layer of ADR 0016. Both ship in v1.2.

@@ -11,10 +11,14 @@ formulas behind every number Navune reports.
   to each analyzed file of the imported package.
 - **Second layer** — types/classes (not present for C) nested under files.
 - **Third layer** — functions/methods nested under types or files.
-- **Test file** — analyzed and reported in a separate `tests` namespace,
-  excluded from budgets, coupling/cycle math, and the composite (ADR 0011).
+- **Test file** — a file whose name matches the language's test pattern or that
+  sits under a `test`/`tests` path component below the analysis root. Analyzed
+  and reported in a separate `tests` namespace, excluded from budgets,
+  coupling/cycle math, the composite, and the extended measures and smells
+  (ADR 0011, ADR 0015, ADR 0016).
 - **Generated / vendored file** — skipped entirely (built-in per-language
-  exclusion patterns, overridable) (ADR 0011).
+  exclusion patterns, overridable) (ADR 0011). C/C++ reuses the
+  `Code generated … DO NOT EDIT` marker (ADR 0017).
 
 ## Metrics
 
@@ -24,6 +28,20 @@ formulas behind every number Navune reports.
 - **Cyclomatic complexity** — per function: 1 + number of decision points
   (`if`, `for`, `while`, `case`, `&&`, `||`, `?`, exception handlers, etc.),
   language-aware. Rolled up to worst-case and average per file.
+- **Cognitive complexity** — per function: SonarSource's model of how hard
+  control flow is to follow — `+1` per flow break, a nesting penalty per
+  nesting level, `+1` per sequence of like logical operators, and `+1` per
+  direct self-call. Rolled up to worst-case and average per file (ADR 0015).
+- **Comment lines / comment density** — significant comment lines (blank and
+  decorative lines excluded, commented-out code counted); density is
+  `comment_lines / (physical_sloc + comment_lines)` (ADR 0015).
+- **Function length** — non-comment physical lines of a function.
+- **Nesting depth** — deepest control-structure nesting in a function, excluding
+  nested function bodies.
+- **Parameter count** — declared parameters of a function, excluding
+  receiver/`self`.
+- **Duplicated lines** — physical lines spanned by duplicated token blocks,
+  distinct from the token-based duplication share.
 - **Ca (afferent coupling)** — number of internal files that depend on this file.
 - **Ce (efferent coupling)** — number of internal files this file depends on.
 - **Instability I** — Ce / (Ca + Ce). 0 = maximally stable, 1 = maximally
@@ -38,15 +56,30 @@ formulas behind every number Navune reports.
 - **Duplication** — language-aware token-normalized blocks shared across or
   within files, above minimum-length thresholds, expressed as count and % of
   tokens/lines duplicated.
+- **Anonymous function** — a lambda, closure, or arrow function, emitted as a
+  first-class function unit named `<anonymous@Lstart>` with its enclosing
+  function recorded; measured by every metric (ADR 0015).
 
 ## Quality model
 
 - **Budget** — a per-metric limit configured in `navune.yaml` (e.g., max average
-  complexity, max % duplication). Breach of an `error`-tier budget → nonzero
-  exit (ADR 0009).
+  complexity, max % duplication). Budgets are **upper-bound-only**. Breach of an
+  `error`-tier budget → nonzero exit (ADR 0009).
+- **Per-language budget** — a budget configured under `language_budgets` for a
+  specific language; evaluated over that language's production files in addition
+  to the global budgets. The composite uses global values only (ADR 0016).
 - **Composite index (0–100)** — transparent blend: per-metric distance-from-
   budget scores combined with config-file weights. Formula documented in the
   README (ADR 0009).
+- **Smell rule** — a deterministic threshold predicate over a structural
+  measure (e.g. cognitive complexity > 15). Ten rules ship, all enabled by
+  default; none gate unless budgeted (ADR 0016).
+- **Issue** — a located finding produced by a smell rule:
+  `{rule, file, line, function, severity, value, threshold}`. Production-only,
+  deterministically ordered (ADR 0016).
+- **Severity** — MQR scale `blocker`, `high`, `medium`, `low`, `info`.
+  Informational; gating is opt-in via `max_issues` and per-severity budgets
+  (ADR 0016).
 - **Internal graph** — dependency edges between files *within* the analysis
   root; the only edges that participate in metrics/gates (ADR 0010).
 - **External edge** — an import/resolution pointing outside the analysis root;
@@ -59,11 +92,17 @@ formulas behind every number Navune reports.
   language (ADR 0006).
 - **Pure-Go adapter** — `go/parser` for Go. No cgo.
 - **tree-sitter adapter** — tree-sitter grammar-driven adapters for TS/JS and
-  Python (`internal/lang/treescript`, `internal/lang/python`). Require cgo;
-  compiled in by default (ADR 0007).
+  Python (`internal/lang/treescript`, `internal/lang/python`) and for C/C++
+  (`internal/lang/cfamily`). Require cgo; compiled in by default (ADR 0007).
+- **C-family adapter** — the shared `internal/lang/cfamily` adapter over the
+  `tree-sitter-c` and `tree-sitter-cpp` grammars. `.h` files are content-sniffed
+  to choose the grammar; C has no type layer, C++ types are classes/structs
+  (ADR 0017).
 - **navune.yaml** — configuration: exclusions, budgets, composite weights,
-  severity tiers. Discovered upward from the analyze target; `navune init`
-  scaffolds it.
+  severity tiers, smell rules, per-language overrides, and `include_paths`.
+  Discovered upward from the analyze target; `navune init` scaffolds it.
+- **include_paths** — config list of directories, relative to the config file,
+  used to resolve C/C++ `#include` directives (ADR 0017).
 - **Workspace-root import resolution** — for TS/JS and Python, an import is
   internal only if it resolves to an analyzed file under the analysis root
   (relative specifiers / dotted modules; best-effort). Everything else is
@@ -75,3 +114,6 @@ formulas behind every number Navune reports.
   3 internal error (4+ reserved) (ADR 0012).
 - **Text / JSON / Mermaid** — the three output formats of `navune analyze`
   (ADR 0008). JSON is the versioned machine contract.
+- **--verbose / -v** — adds per-function detail: a `functions_detail` array in JSON,
+  and functions carrying smells in the text report. `-V` prints the version
+  (ADR 0016).

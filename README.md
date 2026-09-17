@@ -4,11 +4,12 @@
 
 Navune (NAV + UNE, from Latin *nāvis*, "ship/navigate") is a command-line
 analyzer that computes *structural quality* metrics for Go,
-TypeScript/JavaScript, and Python codebases: size, cyclomatic complexity,
-duplication, internal dependency graphs, cyclic dependencies, and Martin's
-coupling metrics. It judges the result against configurable budgets and emits
-a transparent 0–100 composite score. Additional languages (C, C++) are on the
-roadmap via tree-sitter.
+TypeScript/JavaScript, and Python codebases: size, cyclomatic and cognitive
+complexity, comment density, function shape, duplication, internal dependency
+graphs, cyclic dependencies, and Martin's coupling metrics. It judges the result
+against configurable budgets, reports deterministic structural smells, and emits
+a transparent 0–100 composite score. C and C++ are designed via a shared
+tree-sitter adapter and land on the roadmap.
 
 - [Quickstart](#quickstart)
 - [Why structural quality?](#why-structural-quality)
@@ -51,7 +52,10 @@ Files:  3 production · 1 test · 1 generated skipped · 1 dirs excluded
 Size:   33 physical SLOC · 25 logical LOC
 Types:  2 (0 abstract)
 Complexity:  avg 2.20 / function · worst 3 (pkg/alpha/a.py: helper)
-Duplication: 0 / 212 tokens (0.00%) · 0 blocks
+Cognitive:   avg 1.30 / function · worst 3
+Shape:       longest 6 lines · max nesting 2 · max params 1
+Comments:    0 lines (0.00%)
+Duplication: 0 / 212 tokens (0.00%) · 0 blocks · 0 lines
 Cycles:      1 component(s) · 3/3 files in cycle (100.00%) · largest 3
 
 Cyclic dependencies (structural debt):
@@ -87,17 +91,22 @@ Navune does not try to replace them.
 
 - **Unit of analysis is the file, in every language** — one uniform element
   model (`file → type/class → function/method`), one metric pipeline.
-- **Full metric set**: physical & logical SLOC, cyclomatic complexity,
-  duplication, dependency cycles (SCCs), Ca/Ce → instability, abstractness,
-  and distance from the main sequence. See
-  [`docs/metrics.md`](docs/metrics.md).
+- **Full metric set**: physical & logical SLOC, cyclomatic and cognitive
+  complexity, comment density, function length/nesting/parameters, duplication,
+  dependency cycles (SCCs), Ca/Ce → instability, abstractness, and distance from
+  the main sequence. See [`docs/metrics.md`](docs/metrics.md).
+- **Deterministic structural smells.** Ten threshold rules over those measures
+  produce located issues with MQR severities — no hand-written bug database, no
+  heuristics. See [ADR 0016](docs/adr/0016-deterministic-smell-layer.md).
 - **Budgets first, composite second.** `navune.yaml` defines per-metric limits;
   breach an `error`-tier budget and the exit code says so (0 pass · 1 breach ·
   2 usage error). The 0–100 composite is a *transparent, documented blend* of
-  per-metric distance-from-budget — no opaque industry numerology.
+  per-metric distance-from-budget — no opaque industry numerology. Budgets can
+  be global or per-language.
 - **Multi-language.** Go (via `go/parser`), TypeScript/JavaScript and Python
-  (via the official tree-sitter Go bindings) feed the same uniform element
-  model. Building requires cgo and a C toolchain.
+  (via the official tree-sitter Go bindings), and C/C++ (shared tree-sitter
+  adapter) feed the same uniform element model. Building requires cgo and a C
+  toolchain.
 - **Machine contracts.** A versioned JSON schema is the primary integration
   surface; a Mermaid exporter renders the dependency graph (cycles visible in
   your editor) for free.
@@ -111,8 +120,8 @@ Navune does not try to replace them.
 | Go                    | `go/parser` (pure Go)     | v1     |
 | TypeScript/JavaScript | tree-sitter (cgo)         | v1.1   |
 | Python                | tree-sitter (cgo)         | v1.1   |
-| C                     | tree-sitter (cgo)         | planned |
-| C++                   | tree-sitter (cgo)         | planned |
+| C                     | tree-sitter (cgo)         | v1.2   |
+| C++                   | tree-sitter (cgo)         | v1.2   |
 
 > Why tree-sitter (and cgo)? No importable pure-Go TypeScript parser exists
 > (esbuild's parser is `internal/` to its module), and tree-sitter's Go
@@ -121,6 +130,10 @@ Navune does not try to replace them.
 > import/dependency resolution is workspace-root best-effort: relative
 > specifiers and dotted modules that map to an analyzed file are internal;
 > everything else (node_modules, site-packages, bare packages) is external.
+> C/C++ use one shared `internal/lang/cfamily` adapter over the
+> `tree-sitter-c`/`tree-sitter-cpp` grammars, with `#include` resolved quoted-
+> relative and against `include_paths`; `.h` files are content-sniffed
+> ([ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)).
 
 ## Output formats
 
@@ -167,11 +180,29 @@ weights:            # composite blend; every budgeted metric may be weighted
   max_duplication_pct:   20
   max_cycle_members:     20
   max_in_cycle_pct:      20
+
+smells:             # structural smell rules; all enabled by default
+  cognitive-complexity: { enabled: true, threshold: 15, severity: high }
+
+language_smells:    # per-language threshold overrides (full rule objects)
+  python:
+    function-length: { threshold: 50 }
+
+language_budgets:   # per-language limits, evaluated in addition to the global ones
+  python:
+    avg_complexity: { limit: 8, tier: warn }
+
+include_paths:      # C/C++ #include search directories (relative to this file)
+  - include
+  - third_party/headers
 ```
 
 Run `navune init` to write this commented template to your project root.
 `navune analyze` auto-discovers `navune.yaml` by walking upward from the
-analyzed path; `--config` overrides discovery.
+analyzed path; `--config` overrides discovery. The full schema — smell rules,
+per-language overrides, and `include_paths` — is specified in
+[ADR 0016](docs/adr/0016-deterministic-smell-layer.md) and
+[ADR 0017](docs/adr/0017-c-and-cpp-adapters.md).
 
 ## The composite index (transparent by design)
 
@@ -194,10 +225,12 @@ composite — budgets decide, the composite informs.
   `*.pb.go`, `*.min.js`, lockfiles, …) with sensible built-in patterns,
   overridable in config.
 - **Test files are analyzed but kept in a separate `tests` namespace** — visible
-  in reports, excluded from budgets, cycles, coupling, and the composite.
+  in reports, excluded from budgets, cycles, coupling, the composite, and the
+  smell layer. A file is a test if its name matches the language's pattern or it
+  sits under a `test`/`tests` path component below the analysis root.
 - **Only internal edges count** toward metrics and gates. Imports that do not
-  resolve to an analyzed file (stdlib, `node_modules`, site-packages) never
-  become graph edges.
+  resolve to an analyzed file (stdlib, `node_modules`, site-packages, system
+  headers) never become graph edges.
 
 ## Documentation
 
@@ -227,15 +260,18 @@ internal/              private application & analysis code (not importable by ot
   gate                 budget evaluation, verdict, exit codes, transparent composite
   graph                internal dependency graph, SCC cycle detection (Tarjan),
                        coupling Ca/Ce, instability/abstractness, main-sequence distance
+  smell                deterministic structural rules → located issues (MQR severities)
   lang                 uniform element model (file → type → function); parser interface
   lang/golang          Go adapter over go/parser → element model + normalized tokens
   lang/treescript      TS/JS adapter over the tree-sitter JS/TS grammars
   lang/python          Python adapter over the tree-sitter Python grammar
+  lang/cfamily         C/C++ adapter over the tree-sitter C/C++ grammars (shared)
   report               text summary, versioned JSON schema, Mermaid graph export
 configs/               sample navune.yaml configuration
 docs/                  usage, metrics, glossary, ADRs and contributor guide
 test/                  external test data: committed golden fixtures
-                       (fixture/ Go, fixture-ts/, fixture-py/), nested modules
+                       (fixture/ Go, fixture-ts/, fixture-py/, fixture-c/),
+                       nested modules
 ```
 
 Language adapters convert a parsed AST into Navune's uniform element model and
@@ -247,7 +283,8 @@ best-effort (`internal/analysis/resolve.go`).
 ### Repository layout notes
 
 - `internal/` holds all Go packages; they are private by compiler enforcement.
-- `test/` contains `fixture/` (Go), `fixture-ts/`, and `fixture-py/`, each a
+- `test/` contains `fixture/` (Go), `fixture-ts/`, `fixture-py/`, and
+  `fixture-c/`, each a
   self-contained module used as golden test data. Being nested modules
   (`go.mod` inside), they are excluded from `go build ./...`, `go test
   ./...`, and Navune's own analysis runs, exactly like the Go toolchain skips
@@ -273,8 +310,12 @@ See [`docs/development.md`](docs/development.md) and
 
 - **v1** — Go, full metric model including duplication.
 - **v1.1** — TypeScript/JavaScript + Python via tree-sitter.
-- **v1.x** — HTML report; directory-level aggregation views.
-- **later milestones** — C, then C++ via tree-sitter.
+- **v1.2** — extended structural measures (cognitive complexity, comments,
+  function shape, duplicated lines), the deterministic smell layer, and C/C++
+  ([ADR 0015](docs/adr/0015-extended-structural-measures.md),
+  [ADR 0016](docs/adr/0016-deterministic-smell-layer.md),
+  [ADR 0017](docs/adr/0017-c-and-cpp-adapters.md)).
+- **later** — HTML report; directory-level aggregation views.
 
 ## Design record
 

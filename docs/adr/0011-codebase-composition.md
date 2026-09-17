@@ -31,3 +31,15 @@ test code.
 - Config schema needs an exclusion mechanism (built-in + user patterns).
 - The analyzer must classify every file as production / test / skipped before
   metrics are computed.
+
+## Revision 1 (2026-09-17)
+
+Test detection gains a **directory-based** rule in addition to filename
+patterns: any file under a `test` or `tests` path component is a test. The rule
+applies to **all** languages, matches only components strictly below the
+analysis root (the root's own name is ignored), and is exact-lowercase. It is
+unioned with the existing per-language filename patterns, so a file is a test if
+either rule matches. For C/C++, filename patterns are `test_*` and `*_test`
+with `.c/.cc/.cpp/.cxx/.h/.hpp/.hh` (ADR 0017), and generated detection reuses
+the `Code generated … DO NOT EDIT` marker. Test files remain excluded from the
+new measures and smells (ADR 0015, ADR 0016).

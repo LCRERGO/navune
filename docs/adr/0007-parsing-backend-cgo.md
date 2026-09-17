@@ -54,3 +54,11 @@ replaces the earlier "cgo behind build tags / pure-Go core" posture.
   adapter architecture.
 - Later language milestones only touch the parser adapter layer, not the metric
   pipeline (ADR 0006).
+
+## Revision 3 (2026-09-17)
+
+C and C++ are now designed as a single shared `internal/lang/cfamily`
+tree-sitter adapter using the `tree-sitter-c` and `tree-sitter-cpp` Go bindings
+(ADR 0017). They reuse the same element model and metric pipeline; no pipeline
+changes. The grammars are already present in `go.sum` and the module cache and
+become real `go.mod` dependencies when the adapter lands.

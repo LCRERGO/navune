@@ -29,6 +29,7 @@ report to stdout.
 | `--config FILE` | Use `FILE` instead of discovering `navune.yaml` upward from the target. |
 | `--format FMT`  | Output format: `text` (default), `json`, or `mermaid`.          |
 | `--out FILE`    | Write the report to `FILE` instead of stdout.                     |
+| `--verbose`, `-v` | Add per-function detail: a `functions_detail` array per file in JSON, and functions carrying smells in the text report. |
 
 Exit code reflects the quality gate: see [Exit codes](#exit-codes).
 
@@ -44,6 +45,8 @@ Writes a commented `navune.yaml` template into the directory `path` (default
 ### version
 
 Prints the version, platform, and the languages Navune can analyze.
+`-V` is a short alias. (`-v` is `--verbose` on `analyze`; this is a breaking
+change from earlier releases, where `-v` printed the version.)
 
 ### help
 
@@ -69,7 +72,9 @@ filesystem root, and uses the first one found. Pass `--config` to bypass
 discovery. `navune init` scaffolds a commented template you can edit.
 
 See [Configuration](../README.md#configuration-navuneyaml) in the README for
-the schema, or run `navune init` and read the generated file.
+the schema, or run `navune init` and read the generated file. The schema covers
+`exclude`, `budgets`, `weights`, `smells`, `language_smells`, `language_budgets`,
+and `include_paths` (ADR 0016, ADR 0017).
 
 ## Examples
 
@@ -79,6 +84,9 @@ navune analyze .
 
 # Machine-readable report for CI consumers.
 navune analyze ./src --format json
+
+# Per-function detail (JSON gains a functions_detail array; text lists functions with smells).
+navune analyze . --verbose
 
 # Dependency graph for your editor (cycles rendered as subgraphs).
 navune analyze . --format mermaid --out deps.mmd

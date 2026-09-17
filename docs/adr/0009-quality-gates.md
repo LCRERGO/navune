@@ -37,3 +37,21 @@ engineer's review.
 - Composite semantics are fully documented and reproducible.
 - CI integration is a single nonzero exit code; severity tiers (error/warn/info)
   are configurable per metric.
+
+## Revision 1 (2026-09-17)
+
+Budgets remain **upper-bound-only** ("smaller is better"); the transparent
+composite formula is unchanged. The gate model is extended by ADR 0016:
+
+- The new measures of ADR 0015 become budgetable, opt-in: cognitive complexity,
+  function length, nesting depth, parameter count, and duplicated lines. Issue
+  counts are also budgetable (`max_issues` and per-severity keys). **No new
+  default budgets ship**, so existing runs and composites are unchanged.
+- **Per-language budgets** are supported via `language_budgets`, keyed by
+  language. They are evaluated over that language's production files in
+  addition to the global budgets; the composite continues to use global values
+  only.
+- `BudgetResult` gains a `language` field (`""` = global).
+- `comment-density` is a "lower is better" measure and is deliberately **not** a
+  budget key; it is expressed as a smell rule (ADR 0016).
+- Config `version` stays `1`; the additions are additive.

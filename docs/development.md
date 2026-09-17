@@ -10,10 +10,12 @@ internal/lang            uniform element model (file → type → function) + pa
 internal/lang/golang     Go adapter over go/parser (pure Go)
 internal/lang/treescript TS/JS adapter over tree-sitter JS/TS grammars (cgo)
 internal/lang/python     Python adapter over the tree-sitter Python grammar (cgo)
+internal/lang/cfamily    C/C++ adapter over tree-sitter C/C++ grammars (cgo, shared)
 internal/discover        file walking, exclusions, nested-module detection, test classification
 internal/analysis        pipeline orchestration; script import resolution; the Report model
 internal/dup             token-normalized duplication detection
 internal/graph           internal dependency graph, SCC cycle detection, coupling metrics
+internal/smell           deterministic structural rules → located issues
 internal/gate            budget evaluation → verdict, exit codes, composite index
 internal/report          text / JSON / Mermaid renderers
 internal/config          navune.yaml parsing, defaults, budgets, weights, exclusions
@@ -62,14 +64,23 @@ and packages everything as a workflow artifact but creates no release.
 
 - **File is the unit of analysis** in every language (ADR 0006).
 - Only **internal edges** participate in graph metrics and gates; unresolved
-  imports (stdlib, `node_modules`, site-packages) never create edges
-  (ADR 0010).
+  imports (stdlib, `node_modules`, site-packages, system headers) never create
+  edges (ADR 0010). C/C++ `#include` resolution is quoted-relative plus
+  `include_paths` (ADR 0017).
 - **Test files** are analyzed but reported in a separate `tests` namespace —
-  excluded from budgets, cycles, coupling, and the composite (ADR 0011).
+  excluded from budgets, cycles, coupling, the composite, and the smell layer
+  (ADR 0011). Test classification is filename patterns **or** a `test`/`tests`
+  path component below the root, for every language.
+- **Anonymous functions** are first-class function units (`<anonymous@Lstart>`)
+  and are measured by every metric (ADR 0015).
 - Duplication is token-based and language-agnostic: comments stripped,
   string/number literals normalized, identifiers verbatim.
+- **Budgets are upper-bound-only**; per-language budgets are evaluated in
+  addition to global ones, and the composite uses global values only
+  (ADR 0009, ADR 0016). Smell rules never gate unless a budget is configured.
 - Report output is deterministic; the JSON schema (`schema_version: 1`) is a
-  frozen contract — do not rename `json` tags casually.
+  frozen contract — additive fields only, and do not rename `json` tags
+  casually. Issues are sorted by (path, line, rule).
 
 ## Extending a language / adding one
 

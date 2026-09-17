@@ -2,7 +2,8 @@
 
 Navune is a Go CLI that statically measures structural code quality (SLOC,
 cyclomatic complexity, duplication, dependency cycles, Martin's coupling
-metrics) of Go, TypeScript/JavaScript, and Python codebases. Design decisions
+metrics) of Go, TypeScript/JavaScript, Python, C, and C++ codebases. Design
+decisions
 and metric definitions live in `docs/adr/*.md` and `docs/glossary.md`; read
 those before changing metric semantics.
 
@@ -30,7 +31,8 @@ those before changing metric semantics.
   `lang.FileResult` (files → types → functions, normalized token stream).
   Analysis, graph, duplication, and report code is language-agnostic.
 - **New test fixtures under `test/` MUST be self-contained modules** (own
-  `go.mod`, e.g. `test/fixture`, `test/fixture-ts`, `test/fixture-py`). Without
+  `go.mod`, e.g. `test/fixture`, `test/fixture-ts`, `test/fixture-py`,
+  `test/fixture-c`). Without
   one they get swept into `go test ./...` and into Navune's self-analysis,
   polluting metrics. Discovery deliberately skips nested `go.mod` dirs.
 - Integration tests reference fixtures by relative path, e.g.
