@@ -53,6 +53,10 @@ func ifsSource(lang string, n int) string {
 		}
 		b.WriteString("    return 0;\n}\n")
 		return b.String()
+	case "java":
+		return javaIfs(n)
+	case "rust":
+		return rustIfs(n)
 	}
 	return ""
 }
@@ -74,6 +78,8 @@ func TestSmellCountRises(t *testing.T) {
 		{"py", "main.py"},
 		{"c", "main.c"},
 		{"cpp", "main.cpp"},
+		{"java", "Main.java"},
+		{"rust", "main.rs"},
 	}
 	for _, c := range cases {
 		c := c

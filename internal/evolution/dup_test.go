@@ -78,6 +78,8 @@ func TestDuplicationAppears(t *testing.T) {
 		{"py", dupStepsPy()},
 		{"c", dupStepsC()},
 		{"cpp", dupStepsCPP()},
+		{"java", dupStepsJava()},
+		{"rust", dupStepsRust()},
 	}
 	for _, c := range cases {
 		c := c
