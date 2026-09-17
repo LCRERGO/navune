@@ -1,0 +1,157 @@
+.\" Manpage for navune.
+.TH NAVUNE 1 "2026-09-17" "navune" "User Commands"
+.SH NAME
+navune \- measure the structural quality of a codebase
+.SH SYNOPSIS
+.B navune
+.B analyze
+.RI [ path ]
+.RI [ options ]
+.br
+.B navune
+.B init
+.RI [ path ]
+.br
+.B navune
+.B version
+.br
+.B navune
+.B help
+.RI [ command ]
+.SH DESCRIPTION
+.B navune
+computes structural quality metrics for Go, TypeScript/JavaScript, Python, C,
+and C++ codebases: physical and logical SLOC, cyclomatic and cognitive
+complexity, comment density, function shape, duplication, internal dependency
+graphs, cyclic dependencies, and Martin's coupling metrics. It evaluates the
+result against configurable budgets, reports deterministic structural smells,
+and emits a transparent 0\-100 composite score.
+.PP
+The unit of analysis is the file. Test files are analyzed but reported in a
+separate
+.I tests
+namespace and excluded from budgets, cycles, coupling, the composite, and the
+smell layer. Only imports that resolve to an analyzed file become graph edges;
+unresolved imports (standard library, node_modules, site\-packages, system
+headers) never do.
+.SH COMMANDS
+.TP
+.B analyze
+.RI [ path ]
+Measure the codebase rooted at
+.I path
+(default
+.BR . ).
+Writes a report to standard output unless
+.B \-\-out
+is given.
+.TP
+.B init
+.RI [ path ]
+Write a commented
+.B navune.yaml
+template into the directory
+.I path
+(default
+.BR . ).
+Fails if the file already exists.
+.TP
+.B version
+Print the version, platform, and supported languages.
+.B \-V
+and
+.B \-\-version
+are aliases.
+.TP
+.B help
+.RI [ command ]
+Show top\-level help, or help for
+.IR command .
+.B \-h
+and
+.B \-\-help
+are aliases.
+.SH OPTIONS
+Global options:
+.TP
+.BR \-h ", " \-\-help
+Show help and exit.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit.
+.PP
+Options for
+.BR "navune analyze" :
+.TP
+.BI \-\-config " FILE"
+Use
+.I FILE
+instead of discovering
+.B navune.yaml
+by walking upward from the analyzed path.
+.TP
+.BI \-\-format " FMT"
+Report format:
+.BR text " (default), " json ", or " mermaid .
+.TP
+.BI \-\-out " FILE"
+Write the report to
+.I FILE
+instead of standard output.
+.TP
+.BR \-\-verbose ", " \-v
+Add per\-function detail: a
+.I functions_detail
+array per file in JSON, and functions carrying smells in the text report.
+.TP
+.BR \-h ", " \-\-help
+Show help for
+.B analyze
+and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+Pass: all error\-tier budgets satisfied.
+.TP
+.B 1
+Breach: at least one error\-tier budget was exceeded.
+.TP
+.B 2
+Usage or configuration error.
+.TP
+.B 3
+Internal error (for example, a source file could not be parsed).
+.PP
+Warn\-tier breaches are reported but do not change the exit code.
+.SH FILES
+.TP
+.I navune.yaml
+Project configuration: exclusions, budgets, weights, smell rules,
+per\-language overrides, and C/C++ include paths. Discovered by walking upward
+from the analyzed path, or selected explicitly with
+.BR \-\-config .
+.TP
+.I navune.yaml.example
+Sample configuration shipped in the source distribution.
+.SH EXAMPLES
+.TP
+.B navune analyze .
+Analyze the current directory and print the text report.
+.TP
+.B navune analyze ./src \-\-format json
+Emit the versioned JSON report.
+.TP
+.B navune analyze . \-\-format mermaid \-\-out deps.mmd
+Write the dependency graph, with cycles grouped into subgraphs.
+.TP
+.B navune init
+Scaffold a commented
+.B navune.yaml
+in the current directory.
+.SH SEE ALSO
+.I docs/usage.md
+in the navune source distribution for the full CLI reference,
+.I docs/metrics.md
+for metric definitions, and
+.I docs/adr/
+for the design record.

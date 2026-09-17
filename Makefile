@@ -1,6 +1,9 @@
-.PHONY: build test vet fmt checkfmt install analyze evolve clean
+.PHONY: build test vet fmt checkfmt install install-completions install-man analyze evolve clean
 
 BIN := bin/navune
+PREFIX ?= /usr/local
+BASH_COMPLETION_DIR ?= $(PREFIX)/share/bash-completion/completions
+MAN_DIR ?= $(PREFIX)/share/man/man1
 
 build: $(BIN)
 
@@ -21,6 +24,16 @@ checkfmt:
 
 install:
 	go install ./cmd/navune
+
+# Install the bash completion (as an extensionless file, per bash-completion
+# convention) and the man page. Override PREFIX/DESTDIR for staging.
+install-completions: completions/navune.bash
+	install -d "$(DESTDIR)$(BASH_COMPLETION_DIR)"
+	install -m 644 completions/navune.bash "$(DESTDIR)$(BASH_COMPLETION_DIR)/navune"
+
+install-man: man/navune.1
+	install -d "$(DESTDIR)$(MAN_DIR)"
+	install -m 644 man/navune.1 "$(DESTDIR)$(MAN_DIR)/navune.1"
 
 # Analyze Navune's own source tree (self-analysis smoke test).
 analyze:
